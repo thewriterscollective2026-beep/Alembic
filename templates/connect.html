@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block auth_content %}
+<div class="auth-card" style="text-align:left;max-width:480px">
+  <div style="text-align:center">
+    <img class="logo" src="/static/irizpro-logo.png" alt="IrizPro">
+    <h1 style="font-size:22px">Connect your work email</h1>
+    <p class="lead" style="margin:8px 0 22px">Works with Hostinger, Zoho, Outlook, and any IMAP mailbox.
+    We'll detect the server settings from your address.</p>
+  </div>
+
+  <form method="post" action="/connect" class="form" style="max-width:none;margin:0;gap:16px">
+    <label class="field">
+      <span class="label">Email address</span>
+      <input type="email" name="email" placeholder="you@irizpro.com" required autofocus>
+    </label>
+    <label class="field">
+      <span class="label">Password</span>
+      <span class="hint">Your mailbox password. If your account uses 2-factor, create an
+      <strong>app password</strong> and use that.</span>
+      <input type="password" name="password" required>
+    </label>
+
+    <details>
+      <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Advanced — server settings (optional)</summary>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:12px">
+        <input type="text" name="imap_host" placeholder="IMAP host (auto)">
+        <input type="text" name="imap_port" placeholder="993">
+        <input type="text" name="smtp_host" placeholder="SMTP host (auto)">
+        <input type="text" name="smtp_port" placeholder="465">
+      </div>
+      <p class="hint" style="margin-top:8px">Leave blank to auto-detect (Hostinger: imap/smtp.hostinger.com).</p>
+    </details>
+
+    <button class="btn" type="submit" style="justify-content:center">Connect mailbox</button>
+  </form>
+
+  <p class="note" style="text-align:center;margin-top:18px"><a href="/">← Back to sign-in options</a></p>
+</div>
+{% endblock %}

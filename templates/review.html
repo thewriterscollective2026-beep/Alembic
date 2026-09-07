@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <h1>Run details</h1>
+  <span class="status s-{{ draft.stage }}">{{ stage_labels.get(draft.stage, draft.stage) }}</span>
+</div>
+
+{% if draft.stage == "error" %}
+  <div class="warn"><strong>This run failed.</strong><pre>{{ draft.error }}</pre></div>
+{% endif %}
+
+<p class="lead">
+  Built from {{ draft.source_count }} source email(s) · {{ draft.revision_count }} revision(s).
+  {% if draft.stage in ["summary_review", "email_review"] %}
+    <br>Approval happens by <strong>replying to the email in your inbox</strong> — this page is just a read-only view.
+  {% elif draft.stage == "sent" %}
+    <br>Sent to {{ draft.sent_count }} recipient(s){% if draft.sent_at %} on {{ draft.sent_at.strftime("%b %d, %H:%M") }} UTC{% endif %}.
+  {% endif %}
+</p>
+
+{% if draft.source_summary %}
+  <h2>Summary</h2>
+  <div class="preview"><pre style="white-space:pre-wrap;font-family:inherit;margin:0">{{ draft.source_summary }}</pre></div>
+{% endif %}
+
+{% if rendered_html %}
+  <h2>Newsletter draft</h2>
+  <p class="muted">Subject: <strong>{{ draft.subject }}</strong></p>
+  <div class="preview">{{ rendered_html|safe }}</div>
+{% endif %}
+{% endblock %}

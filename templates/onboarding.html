@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <div>
+    <h1>Your newsletters</h1>
+    <p class="lead">We scanned your recent mail and found {{ total }} senders. Tick the ones
+    you want read and repurposed — across any groups. The summary always covers <em>every</em>
+    selected sender.</p>
+  </div>
+  <a class="btn btn-ghost" href="/onboarding?rescan=1">Re-scan inbox</a>
+</div>
+
+<label class="selectall master">
+  <input type="checkbox" id="select-all-master"> <strong>Select all ({{ total }})</strong>
+</label>
+
+<form method="post" action="/senders/save" id="senders-form">
+  {% for category, senders in grouped.items() %}
+    <section class="group" data-cat="{{ category }}">
+      <div class="row-split">
+        <h2 class="cat cat-{{ category }}">{{ category|capitalize }} <span class="muted">({{ senders|length }})</span></h2>
+        <label class="selectall"><input type="checkbox" class="select-all-cat"> Select all {{ category }}</label>
+      </div>
+      <div class="sender-list">
+        {% for s in senders %}
+          <label class="sender">
+            <input type="checkbox" class="sender-cb" name="sender" value="{{ s.id }}" {% if s.selected %}checked{% endif %}>
+            <span class="s-name">{{ s.name or s.email }}</span>
+            <span class="s-email muted">{{ s.email }}</span>
+            <span class="s-count">{{ s.count }} msg</span>
+          </label>
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <p class="muted">No newsletters detected. Try <a href="/onboarding?rescan=1">re-scanning</a>.</p>
+  {% endfor %}
+
+  <div class="sticky-actions">
+    <span class="muted" id="sel-count"></span>
+    <button class="btn" type="submit">Save selection →</button>
+  </div>
+</form>
+
+<script>
+(function () {
+  const master = document.getElementById('select-all-master');
+  const all = () => Array.from(document.querySelectorAll('.sender-cb'));
+  const counter = document.getElementById('sel-count');
+
+  function updateCounter() {
+    const n = all().filter(c => c.checked).length;
+    counter.textContent = n + ' selected';
+    if (master) master.checked = n > 0 && n === all().length;
+    document.querySelectorAll('.group').forEach(g => {
+      const cbs = Array.from(g.querySelectorAll('.sender-cb'));
+      const cat = g.querySelector('.select-all-cat');
+      if (cat) cat.checked = cbs.length > 0 && cbs.every(c => c.checked);
+    });
+  }
+
+  if (master) master.addEventListener('change', () => {
+    all().forEach(c => { c.checked = master.checked; });
+    updateCounter();
+  });
+
+  document.querySelectorAll('.select-all-cat').forEach(cat => {
+    cat.addEventListener('change', () => {
+      cat.closest('.group').querySelectorAll('.sender-cb')
+         .forEach(c => { c.checked = cat.checked; });
+      updateCounter();
+    });
+  });
+
+  all().forEach(c => c.addEventListener('change', updateCounter));
+  updateCounter();
+})();
+</script>
+{% endblock %}

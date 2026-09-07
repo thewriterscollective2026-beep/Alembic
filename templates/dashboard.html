@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <div>
+    <h1>Hi {{ user.name or user.email }} 👋</h1>
+    <p class="lead">
+      {{ selected_count }} newsletter(s) selected ·
+      {{ recipient_count }} recipient(s) ·
+      {{ freq_labels.get(user.frequency, "no schedule set") }}
+      {% if user.schedule_active %}<span class="pill on">active</span>
+      {% else %}<span class="pill off">paused</span>{% endif %}
+    </p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <form method="post" action="/run-now"><button class="btn" type="submit">Run now</button></form>
+    <form method="post" action="/poll-now"><button class="btn btn-ghost" type="submit">Check replies now</button></form>
+  </div>
+</div>
+
+<div class="warn" style="background:#eef4ff;border-color:#c7dbfb">
+  <strong>How approval works:</strong> when a run happens, the tool emails you a
+  <em>summary</em> — reply <strong>APPROVED</strong> from your inbox to continue. Then it emails
+  you the <em>newsletter draft</em> — reply <strong>APPROVED</strong> again and it sends to your list.
+  Reply with changes to revise, or <strong>CANCEL</strong> to stop. You never have to come back here.
+</div>
+
+<div class="cards">
+  <a class="card" href="/onboarding"><h3>1 · Newsletters</h3><p>{{ selected_count }} selected. Change anytime.</p></a>
+  <a class="card" href="/settings"><h3>2 · Recipients &amp; schedule</h3><p>{{ recipient_count }} recipients · {{ freq_labels.get(user.frequency, "not set") }}</p></a>
+  <div class="card"><h3>3 · Approve by email</h3><p>Runs land in your inbox for a reply.</p></div>
+</div>
+
+<h2>Recent runs</h2>
+{% if drafts %}
+<table class="tbl">
+  <thead><tr><th>Started</th><th>Sources</th><th>Stage</th><th>Revisions</th><th></th></tr></thead>
+  <tbody>
+  {% for d in drafts %}
+    <tr>
+      <td>{{ d.created_at.strftime("%b %d, %H:%M") }}</td>
+      <td>{{ d.source_count }}</td>
+      <td><span class="status s-{{ d.stage }}">{% if d.stage in ["summary_review","email_review"] %}<span class="waiting-dot"></span>{% endif %}{{ stage_labels.get(d.stage, d.stage) }}</span></td>
+      <td>{{ d.revision_count }}</td>
+      <td><a href="/review/{{ d.id }}">View</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No runs yet. Set your newsletters + recipients, then hit <strong>Run now</strong> to get the first summary in your inbox.</p>
+{% endif %}
+{% endblock %}

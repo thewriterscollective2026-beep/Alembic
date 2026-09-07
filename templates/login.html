@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block auth_content %}
+<div class="auth-card">
+  <img class="logo" src="/static/irizpro-logo.png" alt="IrizPro">
+  <h1>Alembic</h1>
+  <p class="lead">Turn the newsletters you already receive into one polished, branded issue —
+  summarized, rewritten in your voice, and approved from your inbox.</p>
+
+  {% if missing %}
+    <div class="warn">
+      <strong>Setup needed.</strong> Missing from <code>.env</code>:
+      {% for m in missing %}<code>{{ m }}</code>{% endfor %}. See <code>README.md</code>.
+    </div>
+  {% else %}
+    <div class="auth-methods">
+      {% if google_ok %}
+      <a class="method" href="/login">
+        <span class="ic" style="background:#fff;border:1px solid var(--line)">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6c1.9-5.6 7.1-9.8 13.7-9.8z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.3 28.3c-.5-1.4-.7-2.9-.7-4.3s.3-2.9.7-4.3l-7.8-6C.9 16.9 0 20.3 0 24s.9 7.1 2.5 10.3l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.1-5.5c-2 1.3-4.6 2.1-8.8 2.1-6.6 0-11.8-4.2-13.7-9.8l-7.8 6C6.4 42.6 14.6 48 24 48z"/></svg>
+        </span>
+        <span>Continue with Google<small>Gmail &amp; Google Workspace accounts</small></span>
+      </a>
+      <div class="auth-divider">or</div>
+      {% endif %}
+
+      <a class="method" href="/connect">
+        <span class="ic" style="background:var(--green-050)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-600)" stroke-width="1.8"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M4 7l8 6 8-6"/></svg>
+        </span>
+        <span>Connect your work email<small>Hostinger, Zoho, Outlook &amp; any IMAP mailbox</small></span>
+      </a>
+    </div>
+    <p class="note" style="margin-top:22px">You grant read + send access to your own inbox. Revoke anytime.</p>
+  {% endif %}
+</div>
+{% endblock %}
