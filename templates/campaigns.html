@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <h1>Campaigns</h1>
+</div>
+<p class="lead">Every final send, with delivery/engagement counts from Resend's webhook events.
+Open rate is unreliable (Apple Mail auto-loads tracking pixels) — treat it as a soft signal;
+clicks, bounces, and complaints are the real ones.</p>
+
+{% if rows %}
+<div style="overflow-x:auto">
+<table class="tbl">
+  <thead>
+    <tr>
+      <th>Sent</th>
+      <th>Subject</th>
+      <th style="text-align:right">Recipients</th>
+      <th style="text-align:right">Delivered</th>
+      <th style="text-align:right">Opened</th>
+      <th style="text-align:right">Clicked</th>
+      <th style="text-align:right">Bounced</th>
+      <th style="text-align:right">Complained</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.campaign.sent_at.strftime("%b %d, %H:%M") if row.campaign.sent_at else "—" }}</td>
+      <td>{{ row.campaign.subject }}</td>
+      <td style="text-align:right">{{ row.campaign.recipient_count }}</td>
+      <td style="text-align:right">{{ row.counts.delivered }}</td>
+      <td style="text-align:right">{{ row.counts.opened }}</td>
+      <td style="text-align:right">{{ row.counts.clicked }}</td>
+      <td style="text-align:right">{{ row.counts.bounced }}</td>
+      <td style="text-align:right">{{ row.counts.complained }}</td>
+      <td><a href="/campaigns/{{ row.campaign.id }}">View</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">No campaigns sent yet. A campaign is created the moment a drafted newsletter
+gets approved and sent to your recipient list.</p>
+{% endif %}
+{% endblock %}

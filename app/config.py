@@ -54,6 +54,22 @@ SCAN_MESSAGE_LIMIT = int(os.getenv("SCAN_MESSAGE_LIMIT", "400"))
 # Max web searches Claude may run per newsletter-writing call (cost/latency guardrail).
 WEB_SEARCH_MAX_USES = int(os.getenv("WEB_SEARCH_MAX_USES", "4"))
 
+# --- Resend (bulk newsletter sending - see Newsletter_Tool_Email_Sending_Plan.docx) ---
+# System emails (review/approval) are NOT affected by this - those stay on the
+# client's own Gmail/IMAP mailbox via app/provider.py. This is only for the final
+# blast to the recipient list. TEST values today - swap when the real owner
+# domain is ready; never hardcode a domain/address anywhere in code.
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+# Signing secret for the /webhooks/resend endpoint (Resend dashboard -> Webhooks ->
+# create an endpoint -> copy its secret, whsec_...). Verified via the svix package.
+RESEND_WEBHOOK_SECRET = os.getenv("RESEND_WEBHOOK_SECRET", "")
+# Publicly reachable base URL of THIS app (no trailing slash) - used to build the
+# one-click unsubscribe link embedded in each sent newsletter. Defaults to local
+# dev; must be set to the real deployed HTTPS URL once this is deployed, since a
+# recipient's mail client can't reach localhost.
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+
 # --- Storage ---
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)

@@ -18,10 +18,11 @@
 </div>
 
 <div class="warn" style="background:#eef4ff;border-color:#c7dbfb">
-  <strong>How approval works:</strong> when a run happens, the tool emails you a
-  <em>summary</em> — reply <strong>APPROVED</strong> from your inbox to continue. Then it emails
-  you the <em>newsletter draft</em> — reply <strong>APPROVED</strong> again and it sends to your list.
-  Reply with changes to revise, or <strong>CANCEL</strong> to stop. You never have to come back here.
+  <strong>How approval works:</strong> when a run happens, the tool researches your selected
+  newsletters and emails you the finished <em>newsletter draft</em> — reply
+  <strong>APPROVED</strong> and it sends to your list. Reply with changes instead and it'll
+  research further if your feedback calls for it, fix the draft, and re-send for another look.
+  Reply <strong>CANCEL</strong> to stop. You never have to come back here.
 </div>
 
 <div class="cards">
@@ -39,7 +40,7 @@
     <tr>
       <td>{{ d.created_at.strftime("%b %d, %H:%M") }}</td>
       <td>{{ d.source_count }}</td>
-      <td><span class="status s-{{ d.stage }}">{% if d.stage in ["summary_review","email_review"] %}<span class="waiting-dot"></span>{% endif %}{{ stage_labels.get(d.stage, d.stage) }}</span></td>
+      <td><span class="status s-{{ d.stage }}">{% if d.stage == "review" %}<span class="waiting-dot"></span>{% endif %}{{ stage_labels.get(d.stage, d.stage) }}</span></td>
       <td>{{ d.revision_count }}</td>
       <td><a href="/review/{{ d.id }}">View</a></td>
     </tr>
@@ -47,6 +48,6 @@
   </tbody>
 </table>
 {% else %}
-<p class="muted">No runs yet. Set your newsletters + recipients, then hit <strong>Run now</strong> to get the first summary in your inbox.</p>
+<p class="muted">No runs yet. Set your newsletters + recipients, then hit <strong>Run now</strong> to get your first drafted newsletter in your inbox.</p>
 {% endif %}
 {% endblock %}

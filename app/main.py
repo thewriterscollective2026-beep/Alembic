@@ -3,17 +3,18 @@ email-driven review flow (runs email the user; approvals happen by reply)."""
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 
 import json
-from . import config, auth, gmail_service, ai_service, scheduler, excel_recipients, provider, imap_service, crypto, email_template
+from . import (config, auth, gmail_service, ai_service, scheduler, excel_recipients, provider,
+              imap_service, crypto, email_template, resend_webhooks, unsubscribe)
 from .database import init_db, get_session
-from .models import User, Sender, Draft
-from .pipeline import start_run, poll_run_replies, _parse_recipients
+from .models import User, Sender, Draft, UsageLog, Contact, Campaign, CampaignRecipient
+from .pipeline import start_run, poll_run_replies, active_contact_emails
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 app = FastAPI(title="Alembic")
@@ -23,8 +24,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["freq_labels"] = scheduler.FREQUENCY_LABELS
 
 STAGE_LABELS = {
-    "summary_review": "Awaiting summary approval (check your inbox)",
-    "email_review": "Awaiting newsletter approval (check your inbox)",
+    "review": "Awaiting newsletter approval (check your inbox)",
     "sent": "Sent to your list",
     "cancelled": "Cancelled",
     "no_content": "No new emails found",
@@ -71,7 +71,7 @@ def home(request: Request, db: Session = Depends(get_session)):
     return templates.TemplateResponse("dashboard.html", {
         "request": request, "user": user, "drafts": drafts,
         "selected_count": selected_count,
-        "recipient_count": len(_parse_recipients(user.recipients)),
+        "recipient_count": len(active_contact_emails(db, user.id)),
     })
 
 
@@ -223,10 +223,18 @@ async def save_senders_async(request: Request, db: Session = Depends(get_session
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_session)):
     user = require_user(request, db)
+    statuses = [s for (s,) in db.query(Contact.status).filter_by(user_id=user.id).all()]
+    contact_counts = {
+        "active": statuses.count("active"),
+        "bounced": statuses.count("bounced"),
+        "unsubscribed": statuses.count("unsubscribed"),
+        "complained": statuses.count("complained"),
+    }
     return templates.TemplateResponse("settings.html", {
         "request": request, "user": user,
         "frequencies": scheduler.FREQUENCY_LABELS,
-        "recipient_count": len(_parse_recipients(user.recipients)),
+        "recipient_count": contact_counts["active"],
+        "contact_counts": contact_counts,
         "hours": list(range(24)),
     })
 
@@ -243,10 +251,20 @@ async def upload_recipients(request: Request, file: UploadFile = File(...), db: 
     if not emails:
         request.session["flash"] = "No email addresses found in that file."
         return RedirectResponse("/settings", status_code=303)
-    user.recipients = "\n".join(emails)
-    user.recipients_file = file.filename or "recipients.xlsx"
+
+    filename = file.filename or "recipients.xlsx"
+    existing = {c.email: c for c in db.query(Contact).filter_by(user_id=user.id).all()}
+    added = 0
+    for email in emails:
+        if email in existing:
+            continue  # never reset an existing contact's status (e.g. unsubscribed/bounced) on re-upload
+        db.add(Contact(user_id=user.id, email=email, source=filename))
+        added += 1
+    user.recipients_file = filename  # last-upload filename, for display only
     db.commit()
-    request.session["flash"] = f"Loaded {len(emails)} recipient(s) from {user.recipients_file}."
+    request.session["flash"] = (
+        f"Loaded {len(emails)} recipient(s) from {filename} — {added} new, "
+        f"{len(emails) - added} already on the list.")
     return RedirectResponse("/settings", status_code=303)
 
 
@@ -260,6 +278,7 @@ def save_settings(
     brand_signature: str = Form(""),
     subscribe_url: str = Form(""),
     business_address: str = Form(""),
+    warmup_limit: int = Form(0),
     db: Session = Depends(get_session),
 ):
     user = require_user(request, db)
@@ -270,6 +289,7 @@ def save_settings(
     user.brand_signature = brand_signature.strip()
     user.subscribe_url = subscribe_url.strip()
     user.business_address = business_address.strip()
+    user.warmup_limit = max(0, int(warmup_limit))
     db.commit()
 
     if user.schedule_active:
@@ -325,5 +345,102 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
         )
     return templates.TemplateResponse("review.html", {
         "request": request, "user": user, "draft": draft, "rendered_html": rendered_html,
-        "recipient_count": len(_parse_recipients(user.recipients)),
+        "recipient_count": len(active_contact_emails(db, user.id)),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Dev: per-call Claude usage log (timestamp, tokens, why each call was made)
+# ---------------------------------------------------------------------------
+
+@app.get("/dev/usage", response_class=HTMLResponse)
+def dev_usage(request: Request, db: Session = Depends(get_session)):
+    require_user(request, db)  # any logged-in user - single-deployment dev tool
+    rows = db.query(UsageLog).order_by(UsageLog.created_at.desc()).limit(300).all()
+    totals = {
+        "input": sum(r.input_tokens for r in rows),
+        "output": sum(r.output_tokens for r in rows),
+        "cache_read": sum(r.cache_read_tokens for r in rows),
+        "cache_write": sum(r.cache_write_tokens for r in rows),
+    }
+    return templates.TemplateResponse("usage_log.html", {
+        "request": request, "rows": rows, "totals": totals,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Resend webhook: delivery/engagement events -> CampaignRecipient + Contact
+# suppression. Public route - Resend's servers call this, not a browser
+# session, so no require_user here. Signature verification is what proves
+# a request is genuinely from Resend (see resend_webhooks.py).
+# ---------------------------------------------------------------------------
+
+@app.post("/webhooks/resend")
+async def webhooks_resend(request: Request, db: Session = Depends(get_session)):
+    raw_body = await request.body()
+    try:
+        event = resend_webhooks.verify_and_parse(raw_body, dict(request.headers))
+    except resend_webhooks.InvalidSignature:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    resend_webhooks.apply_event(db, event)
+    return PlainTextResponse("ok")
+
+
+# ---------------------------------------------------------------------------
+# Campaign analytics
+# ---------------------------------------------------------------------------
+
+_ANALYTICS_STATUSES = ("sent", "delivered", "opened", "clicked", "bounced", "complained")
+
+
+@app.get("/campaigns", response_class=HTMLResponse)
+def campaigns_list(request: Request, db: Session = Depends(get_session)):
+    user = require_user(request, db)
+    campaigns = db.query(Campaign).filter_by(user_id=user.id).order_by(Campaign.created_at.desc()).all()
+    rows = []
+    for c in campaigns:
+        statuses = [s for (s,) in db.query(CampaignRecipient.status).filter_by(campaign_id=c.id).all()]
+        rows.append({"campaign": c, "counts": {s: statuses.count(s) for s in _ANALYTICS_STATUSES}})
+    return templates.TemplateResponse("campaigns.html", {
+        "request": request, "user": user, "rows": rows,
+    })
+
+
+@app.get("/campaigns/{campaign_id}", response_class=HTMLResponse)
+def campaign_detail(campaign_id: int, request: Request, db: Session = Depends(get_session)):
+    user = require_user(request, db)
+    campaign = db.get(Campaign, campaign_id)
+    if not campaign or campaign.user_id != user.id:
+        raise HTTPException(404, "Campaign not found")
+    recipients = (
+        db.query(CampaignRecipient, Contact)
+        .join(Contact, CampaignRecipient.contact_id == Contact.id)
+        .filter(CampaignRecipient.campaign_id == campaign.id)
+        .order_by(CampaignRecipient.last_event_at.desc())
+        .all()
+    )
+    statuses = [cr.status for cr, _ in recipients]
+    counts = {s: statuses.count(s) for s in _ANALYTICS_STATUSES}
+    return templates.TemplateResponse("campaign_detail.html", {
+        "request": request, "user": user, "campaign": campaign,
+        "recipients": recipients, "counts": counts,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Unsubscribe: public route, no login. Handles both a normal link click (GET)
+# and RFC 8058 one-click unsubscribe (POST, sent by supporting mail clients
+# with no user interaction) - both take effect immediately, no confirmation
+# step, per the one-click spec.
+# ---------------------------------------------------------------------------
+
+@app.api_route("/unsubscribe/{token}", methods=["GET", "POST"], response_class=HTMLResponse)
+def unsubscribe_contact(token: str, request: Request, db: Session = Depends(get_session)):
+    contact_id = unsubscribe.parse_token(token)
+    contact = db.get(Contact, contact_id) if contact_id else None
+    if contact and contact.status not in ("bounced", "complained"):
+        contact.status = "unsubscribed"
+        db.commit()
+    return templates.TemplateResponse("unsubscribed.html", {
+        "request": request, "found": bool(contact),
     })

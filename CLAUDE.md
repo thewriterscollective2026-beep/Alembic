@@ -70,16 +70,22 @@ scheduler call the exact same `pipeline` functions — there's no separate manua
 
 All calls go through `_complete()`, which tags every call, logs its token usage (the
 `ai_service.usage` logger — input/output/cache tokens per call site, since this is the only
-spend visibility the app has), and routes to a model: `config.CLAUDE_MODEL` (Sonnet 5, the
-quality-sensitive newsletter-writing/research call) or `config.CLAUDE_MODEL_LIGHT` (Haiku
-4.5, for the mechanical calls — sender categorization, source summarization). The
-newsletter-writing calls also set `config.CLAUDE_WRITER_EFFORT` (default `medium`) and use
-Claude's server-side `web_search` tool (capped by `config.WEB_SEARCH_MAX_USES`) to research
-the themes in the merged summary before writing — this is what makes the output more than a
-repackage of the source newsletters. `REPURPOSE_GUIDANCE` and `NO_AI_GUIDANCE` are prompt
-constants distilled from the project owner's own content-repurposing and anti-AI-writing
-style rules — edit these to change the newsletter's voice/style rules, not the per-call
-prompts.
+spend visibility the app has), and routes to a model: `config.CLAUDE_MODEL` (Sonnet 5) or
+`config.CLAUDE_MODEL_LIGHT` (Haiku 4.5, currently only `categorize_senders`).
+
+**Research happens at the summary stage, not at final-write time.** `build_summary` reads
+the raw source newsletters directly (not a pre-condensed version), identifies cross-source
+themes and where sources agree/disagree, spots gaps none of them cover, and uses Claude's
+server-side `web_search` tool (capped by `config.WEB_SEARCH_MAX_USES`) to research those gaps
+— so the brief the user approves by email is already research-backed, not just a digest.
+`build_newsletter_from_summary` (the first draft) then does NOT search — it writes/structures
+from the already-researched summary. `revise_newsletter` and `revise_summary` both keep
+`web_search` available, since user feedback on either stage ("add a recent stat on X") is a
+legitimate on-demand research trigger. The newsletter-writing/revision calls set
+`config.CLAUDE_WRITER_EFFORT` (default `medium`) to control thinking-token spend.
+`REPURPOSE_GUIDANCE` and `NO_AI_GUIDANCE` are prompt constants distilled from the project
+owner's own content-repurposing and anti-AI-writing style rules — edit these to change the
+newsletter's voice/style rules, not the per-call prompts.
 
 **The newsletter body is structured data, not HTML.** `build_newsletter_from_summary` /
 `revise_newsletter` return `{theme, subject, sections}` — `sections` is a JSON object
@@ -88,32 +94,75 @@ prompts.
 text; `app/email_template.py` supplies every HTML tag when rendering. `Draft.content_json`
 stores this; `Draft.theme` (`tech`/`business`/`general`) picks the color variant. The
 `{{FIRST_NAME}}` greeting token (`email_template.GREETING_TOKEN`) is rendered by the template
-itself, not authored by the model, and is substituted per-recipient only at final send
-(`send_personalized`) — every other stage (drafts, review emails) shows the literal token or
-a sample name, never a fabricated real send.
+itself, not authored by the model, and is substituted per-recipient only at final send —
+every other stage (drafts, review emails) shows the literal token or a sample name, never a
+fabricated real send.
+
+### Two separate sending paths — do not mix them up
+
+**System emails** (the drafted-newsletter review request, the approval thread) go through the
+client's own connected mailbox — `app/provider.py`'s `_GmailHandle`/`_ImapHandle`
+(`handle.send_tracked`/`get_new_reply`), used throughout `app/pipeline.py`.
+
+**The final blast to the recipient list** goes through `app/resend_service.py`
+(`send_campaign`), a transactional-email account we control (Resend), NOT the client's
+mailbox — see `Newsletter_Tool_Email_Sending_Plan.docx` for why (deliverability, analytics,
+suppression, a 6,000+ recipient list doesn't belong on a personal inbox). Only
+`pipeline._do_final_send` calls it. `RESEND_API_KEY`/`RESEND_FROM_EMAIL` are pure `.env`
+config — never hardcode a sending domain/address in code, since the domain in use during
+early development is a test domain that gets swapped for the real owner's domain later.
+
+**Analytics come back via `POST /webhooks/resend`** (`app/resend_webhooks.py`, wired in
+`main.py`) — a public route (Resend's servers call it, not a browser session), signature-
+verified with the `svix` package against `RESEND_WEBHOOK_SECRET`. Each event updates the
+matching `CampaignRecipient` (matched by `resend_message_id` == the webhook's `data.email_id`)
+and, for `email.bounced`/`email.complained`, also flips the underlying `Contact.status` -
+that's the actual list-hygiene enforcement point. `/campaigns` and `/campaigns/{id}` show the
+resulting counts. There's no `email.unsubscribed` webhook event (Resend doesn't emit one for
+this integration pattern) - unsubscribe is our own link/route instead (Phase 4 of the sending
+plan, not yet built as of this writing).
 
 ### Data model (`app/models.py`)
 
 - `User` — one row per connected mailbox. `provider` picks Google vs IMAP; credentials are
   stored encrypted (`token_enc`/`refresh_token_enc` for Google, `imap_conn_enc` as JSON for
-  IMAP) via `app/crypto.py` (Fernet, key from `FERNET_KEY`). Also holds schedule settings,
-  the recipient list (parsed from an uploaded Excel, newline-joined), and branding fields
-  used to build the newsletter's voice and footer.
+  IMAP) via `app/crypto.py` (Fernet, key from `FERNET_KEY`). Also holds schedule settings and
+  branding fields used to build the newsletter's voice and footer. `recipients`/
+  `recipients_file` are legacy/unused (superseded by `Contact`) except `recipients_file`,
+  which is still updated as a "last upload" display caption.
 - `Sender` — a detected newsletter sender from the onboarding scan, categorized by Claude,
   with `selected` marking the user's opt-in.
+- `Contact` — one recipient with suppression state (`status`: active/bounced/unsubscribed/
+  complained). The actual send list is `pipeline.active_contacts(db, user_id)` — status
+  `active` only. Uploading an Excel (`main.py`'s `/settings/recipients`) upserts by
+  `(user_id, email)`: new emails get added as `active`, but an existing contact's status is
+  **never** reset by a re-upload — only a Resend webhook event or the unsubscribe link
+  changes it after that.
+- `Campaign` / `CampaignRecipient` — one `Campaign` per final send (`pipeline._do_final_send`
+  creates it), one `CampaignRecipient` per contact recording `resend_message_id` and delivery/
+  engagement `status` (sent/delivered/opened/clicked/bounced/complained) - the analytics
+  source of truth, updated by `app/resend_webhooks.py`.
 - `Draft` — one pipeline run; see the stage lifecycle in its docstring and in "The
   email-approval pipeline" above.
 
 `app/database.py` runs a small hand-rolled auto-migration (`_migrate()`) on startup that adds
 missing columns to an existing SQLite `data/app.db` — when adding a column to `User` or
 `Draft`, add the corresponding `ALTER TABLE` there too (there's no migration *framework* here
-despite the project's own name — no Alembic-the-tool, just this hand-rolled function).
+despite the project's own name — no Alembic-the-tool, just this hand-rolled function). Brand
+new tables (like `Contact`/`Campaign`/`CampaignRecipient`/`UsageLog`) don't need an `ALTER
+TABLE` entry — `Base.metadata.create_all()` in `init_db()` creates any missing table
+automatically.
 
 ### Other modules
 
 - `app/auth.py` — Google OAuth2 flow (`google-auth-oauthlib`), stores/reloads `Credentials`.
 - `app/imap_service.py` — IMAP/SMTP equivalent of `gmail_service.py` for non-Google mailboxes
   (e.g. Hostinger webmail); `guess_settings`/`verify_login` back the `/connect` flow.
+- `app/resend_service.py` — bulk newsletter sending via Resend's batch Emails API (see "Two
+  separate sending paths" above). Third-party API — if you need to change how it calls Resend,
+  fetch their current docs live rather than trusting a remembered shape.
+- `app/resend_webhooks.py` — verifies + applies inbound Resend delivery/engagement events (see
+  "Analytics come back via..." above). Also third-party-API-shaped; same rule applies.
 - `app/attachments.py` — extracts text from PDF/DOCX attachments so they feed into
   summarization.
 - `app/excel_recipients.py` — pulls every email-looking string out of an uploaded `.xlsx`,

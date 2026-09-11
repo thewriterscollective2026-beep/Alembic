@@ -41,6 +41,8 @@ def _migrate():
                 conn.execute(text("ALTER TABLE users ADD COLUMN subscribe_url VARCHAR(512) DEFAULT ''"))
             if "business_address" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN business_address VARCHAR(512) DEFAULT ''"))
+            if "warmup_limit" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN warmup_limit INTEGER DEFAULT 0"))
         if "drafts" in tables:
             dcols = [c["name"] for c in insp.get_columns("drafts")]
             if "stage" not in dcols:  # old schema -> recreate (no live drafts yet)

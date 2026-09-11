@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <h1>{{ campaign.subject }}</h1>
+  <span class="muted">{{ campaign.sent_at.strftime("%b %d, %H:%M") if campaign.sent_at else "—" }} UTC</span>
+</div>
+
+<div class="cards">
+  <div class="card"><h3>{{ campaign.recipient_count }}</h3><p>Recipients</p></div>
+  <div class="card"><h3>{{ counts.delivered }}</h3><p>Delivered</p></div>
+  <div class="card"><h3>{{ counts.opened }}</h3><p>Opened (soft signal)</p></div>
+  <div class="card"><h3>{{ counts.clicked }}</h3><p>Clicked</p></div>
+  <div class="card"><h3>{{ counts.bounced }}</h3><p>Bounced</p></div>
+  <div class="card"><h3>{{ counts.complained }}</h3><p>Complained</p></div>
+</div>
+
+<h2>Recipients</h2>
+{% if recipients %}
+<div style="overflow-x:auto">
+<table class="tbl">
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Status</th>
+      <th>Last event (UTC)</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for cr, contact in recipients %}
+    <tr>
+      <td>{{ contact.email }}</td>
+      <td><span class="status s-{{ cr.status }}">{{ cr.status }}</span></td>
+      <td style="font-family:monospace;font-size:12px">{{ cr.last_event_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">No recipient rows.</p>
+{% endif %}
+{% endblock %}

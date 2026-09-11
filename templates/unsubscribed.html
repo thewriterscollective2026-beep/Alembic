@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unsubscribed</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background: #f4f5fb; color: #191a33;
+           display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .card { background: #fff; border: 1px solid #e3e9f0; border-radius: 16px; padding: 40px;
+            max-width: 420px; text-align: center; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    p { color: #555; font-size: 15px; line-height: 1.6; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    {% if found %}
+      <h1>You're unsubscribed</h1>
+      <p>You won't receive any more of these newsletters. This takes effect immediately.</p>
+    {% else %}
+      <h1>Link no longer valid</h1>
+      <p>This unsubscribe link has already been used or has expired.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

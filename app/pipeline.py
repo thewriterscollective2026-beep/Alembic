@@ -2,24 +2,25 @@
 
 A run flows entirely over the user's own inbox — they never return to the tool:
 
-  scrape (by frequency window) -> summary -> EMAIL summary to user
-    -> user replies "approved" (or edits)         [stage: summary_review]
-  -> write newsletter -> EMAIL draft to user
-    -> user replies "approved" (or edits)         [stage: email_review]
-  -> send to recipient list                       [stage: sent]
+  scrape (by frequency window) -> research + write the full newsletter
+    -> EMAIL the drafted newsletter to user             [stage: review]
+    -> user replies "approved"                          -> send to recipient list [stage: sent]
+    -> user replies with feedback                        -> research further if the feedback
+                                                              calls for it, fix, re-send  [stage: review]
+    -> user replies "cancel"                             -> stop                 [stage: cancelled]
 
 Replies are read from the same Gmail thread. Only a short, clear "approved"
-proceeds; anything else is treated as change requests (revise + re-send). A
-"cancel" reply stops the run. Revisions are capped to avoid runaway loops.
+proceeds; anything else is treated as change requests (revise + re-send) - the
+revision step decides for itself whether the feedback needs fresh web research
+or just a rewrite (see ai_service.revise_newsletter). Revisions are capped to
+avoid runaway loops.
 """
-import html as _html
 import json
-import re
 from datetime import datetime, timedelta
 
 from .database import SessionLocal
-from .models import User, Sender, Draft
-from . import gmail_service, ai_service, provider, email_template
+from .models import User, Sender, Draft, Contact, Campaign, CampaignRecipient
+from . import gmail_service, ai_service, provider, email_template, resend_service
 
 # Frequency -> how many days back to scrape each run
 FREQUENCY_LOOKBACK_DAYS = {
@@ -31,7 +32,7 @@ FREQUENCY_LOOKBACK_DAYS = {
 }
 MAX_REVISIONS = 5
 MAX_SOURCE_EMAILS = 15  # cap emails per run so it stays fast and low-cost
-REVIEW_STAGES = ("summary_review", "email_review")
+REVIEW_STAGES = ("review",)
 
 
 # ---------------------------------------------------------------------------
@@ -70,15 +71,15 @@ def _is_approval(text: str) -> bool:
     return "approv" in first and len(first) <= 25
 
 
-def _parse_recipients(raw: str) -> list[str]:
-    parts = re.split(r"[,\n;\s]+", raw or "")
-    seen, out = set(), []
-    for p in parts:
-        p = p.strip().lower()
-        if p and "@" in p and p not in seen:
-            seen.add(p)
-            out.append(p)
-    return out
+def active_contacts(db, user_id: int) -> list[Contact]:
+    """Every non-suppressed Contact - the send list. Replaces the old flat
+    User.recipients string; a Contact only leaves "active" via a webhook-driven
+    bounce/complaint or the unsubscribe link, never by re-uploading."""
+    return db.query(Contact).filter_by(user_id=user_id, status="active").all()
+
+
+def active_contact_emails(db, user_id: int) -> list[str]:
+    return [c.email for c in active_contacts(db, user_id)]
 
 
 # ---------------------------------------------------------------------------
@@ -91,17 +92,6 @@ _INSTRUCTIONS = (
     'or just reply with the changes you want and I\'ll revise and resend. '
     'Reply <strong>CANCEL</strong> to stop this run.</p>'
 )
-
-
-def _summary_email_html(summary: str, count: int) -> str:
-    body = _html.escape(summary).replace("\n", "<br>")
-    return (
-        f'<p>Here is the summary from your <strong>{count}</strong> selected newsletter '
-        f'email(s). Review it below.</p>'
-        f'<div style="background:#f6f8fb;border:1px solid #e3e9f0;border-radius:10px;'
-        f'padding:16px;font-size:15px;line-height:1.6">{body}</div>'
-        f'{_INSTRUCTIONS}'
-    )
 
 
 def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft_id: int | None = None) -> str:
@@ -135,7 +125,7 @@ def _draft_email_html(user, sections: dict, recipient_count: int, theme: str = "
 
 
 # ---------------------------------------------------------------------------
-# Stage 1: start a run  (scrape -> summary -> email to user)
+# Stage 1: start a run  (scrape -> research -> write the newsletter -> email for review)
 # ---------------------------------------------------------------------------
 
 def start_run(user_id: int) -> dict:
@@ -164,6 +154,8 @@ def start_run(user_id: int) -> dict:
             db.commit()
             return {"ok": True, "reason": f"no new emails in the last {days} day(s)"}
 
+        # Research step: reads the sources directly, finds cross-source themes/gaps,
+        # researches them. This is internal now - not emailed for approval on its own.
         summary = ai_service.build_summary(emails)
         if not summary.strip():
             db.add(Draft(user_id=user_id, stage="no_content", source_count=len(emails)))
@@ -171,19 +163,29 @@ def start_run(user_id: int) -> dict:
             db.commit()
             return {"ok": True, "reason": "no readable content"}
 
-        subject = f"[Approve summary] Newsletter digest — {datetime.utcnow():%b %d}"
-        thread_id, msg_id = handle.send_tracked(
-            user.email, subject, _summary_email_html(summary, len(emails))
-        )
+        result = ai_service.build_newsletter_from_summary(
+            summary, user.brand_name or user.name, user.brand_signature)
+
         draft = Draft(
-            user_id=user_id, stage="summary_review", source_summary=summary,
-            source_count=len(emails), thread_id=thread_id, awaiting_msg_id=msg_id,
+            user_id=user_id, stage="review", source_summary=summary,
+            subject=result["subject"], content_json=json.dumps(result["sections"]),
+            theme=result["theme"], source_count=len(emails),
         )
         db.add(draft)
+        db.flush()  # assigns draft.id, needed for the issue number in the email itself
+
+        recips = active_contact_emails(db, user_id)
+        subject = f"[Approve to send] {result['subject']}"
+        thread_id, msg_id = handle.send_tracked(
+            user.email, subject,
+            _draft_email_html(user, result["sections"], len(recips), result["theme"],
+                              result["subject"], draft.id)
+        )
+        draft.thread_id, draft.awaiting_msg_id = thread_id, msg_id
         user.last_run = datetime.utcnow()
         db.commit()
         db.refresh(draft)
-        return {"ok": True, "draft_id": draft.id, "stage": "summary_review"}
+        return {"ok": True, "draft_id": draft.id, "stage": "review"}
 
     except Exception as e:  # noqa: BLE001
         db.rollback()
@@ -230,21 +232,12 @@ def poll_run_replies(user_id: int) -> dict:
 
             approved = _is_approval(text)
 
-            if draft.stage == "summary_review":
-                if approved:
-                    _advance_to_email_review(db, handle, user, draft)
-                    acted.append((draft.id, "summary_approved"))
-                else:
-                    _revise(db, handle, user, draft, text, kind="summary")
-                    acted.append((draft.id, "summary_revised"))
-
-            elif draft.stage == "email_review":
-                if approved:
-                    _do_final_send(db, handle, user, draft)
-                    acted.append((draft.id, draft.stage))
-                else:
-                    _revise(db, handle, user, draft, text, kind="email")
-                    acted.append((draft.id, "email_revised"))
+            if approved:
+                _do_final_send(db, handle, user, draft)
+                acted.append((draft.id, draft.stage))
+            else:
+                _revise(db, handle, user, draft, text)
+                acted.append((draft.id, "revised"))
 
         return {"ok": True, "acted": acted}
     except Exception as e:  # noqa: BLE001
@@ -254,27 +247,12 @@ def poll_run_replies(user_id: int) -> dict:
         db.close()
 
 
-def _advance_to_email_review(db, handle, user, draft):
-    result = ai_service.build_newsletter_from_summary(
-        draft.source_summary, user.brand_name or user.name, user.brand_signature)
-    draft.subject = result["subject"]
-    draft.content_json = json.dumps(result["sections"])
-    draft.theme = result["theme"]
-    draft.revision_count = 0
-    recips = _parse_recipients(user.recipients)
-    subject = f"[Approve to send] {draft.subject}"
-    tid, mid = handle.send_tracked(
-        user.email, subject,
-        _draft_email_html(user, result["sections"], len(recips), draft.theme, draft.subject, draft.id)
-    )
-    draft.thread_id, draft.awaiting_msg_id = tid, mid
-    draft.stage = "email_review"
-    db.commit()
-
-
 def _do_final_send(db, handle, user, draft):
-    recips = _parse_recipients(user.recipients)
-    if not recips:
+    """The recipient blast goes through Resend (resend_service), NOT the client's
+    own mailbox - see Newsletter_Tool_Email_Sending_Plan.docx. `handle` (the
+    client's Gmail/IMAP) is only used here for the system-email nudges below."""
+    contacts = active_contacts(db, user.id)
+    if not contacts:
         # Can't send with no list — nudge the user and keep waiting.
         note = ('<p>You approved the newsletter, but no recipient list is uploaded yet. '
                 'Upload an Excel of recipient emails in the tool (Settings), then reply '
@@ -285,17 +263,44 @@ def _do_final_send(db, handle, user, draft):
         draft.thread_id, draft.awaiting_msg_id = tid, mid
         db.commit()
         return
+
     sections = json.loads(draft.content_json) if draft.content_json else {}
-    handle.send_personalized(
-        user.email, recips, draft.subject,
-        _wrap(user, sections, draft.theme, draft.subject, draft.id))
+    html = _wrap(user, sections, draft.theme, draft.subject, draft.id)
+
+    try:
+        send_results = resend_service.send_campaign(
+            contacts, draft.subject, html, limit=user.warmup_limit or None)
+    except resend_service.ResendNotConfigured:
+        note = ('<p>You approved the newsletter, but the bulk-sending service '
+                '(Resend) isn\'t configured yet. Set RESEND_API_KEY and '
+                'RESEND_FROM_EMAIL, then reply <strong>APPROVED</strong> here again.</p>')
+        tid, mid = handle.send_tracked(user.email, f"[Action needed] Sender not configured — {draft.subject}", note)
+        draft.thread_id, draft.awaiting_msg_id = tid, mid
+        db.commit()
+        return
+
+    campaign = Campaign(
+        draft_id=draft.id, user_id=user.id, subject=draft.subject,
+        recipient_count=len(send_results), sent_at=datetime.utcnow(),
+    )
+    db.add(campaign)
+    db.flush()
+    for r in send_results:
+        db.add(CampaignRecipient(
+            campaign_id=campaign.id, contact_id=r["contact_id"],
+            resend_message_id=r["resend_message_id"], status="sent",
+        ))
+
     draft.stage = "sent"
-    draft.sent_count = len(recips)
+    draft.sent_count = len(send_results)
     draft.sent_at = datetime.utcnow()
     db.commit()
 
 
-def _revise(db, handle, user, draft, feedback, kind: str):
+def _revise(db, handle, user, draft, feedback):
+    """Apply reviewer feedback to the drafted newsletter and re-send for review.
+    ai_service.revise_newsletter decides for itself whether the feedback needs
+    fresh web research (e.g. "add a recent stat on X") or just a rewrite."""
     if draft.revision_count >= MAX_REVISIONS:
         note = (f'<p>We\'ve hit the revision limit ({MAX_REVISIONS}) for this run. '
                 f'Reply <strong>APPROVED</strong> to accept the current version, or '
@@ -306,20 +311,15 @@ def _revise(db, handle, user, draft, feedback, kind: str):
         return
 
     draft.revision_count += 1
-    if kind == "summary":
-        draft.source_summary = ai_service.revise_summary(draft.source_summary, feedback)
-        subject = f"[Approve summary — revised v{draft.revision_count}] Newsletter digest"
-        html = _summary_email_html(draft.source_summary, draft.source_count)
-    else:
-        current_sections = json.loads(draft.content_json) if draft.content_json else {}
-        result = ai_service.revise_newsletter(
-            current_sections, feedback, draft.subject, draft.theme,
-            user.brand_name or user.name, user.brand_signature)
-        draft.subject, draft.theme = result["subject"], result["theme"]
-        draft.content_json = json.dumps(result["sections"])
-        recips = _parse_recipients(user.recipients)
-        subject = f"[Approve to send — revised v{draft.revision_count}] {draft.subject}"
-        html = _draft_email_html(user, result["sections"], len(recips), draft.theme, draft.subject, draft.id)
+    current_sections = json.loads(draft.content_json) if draft.content_json else {}
+    result = ai_service.revise_newsletter(
+        current_sections, feedback, draft.subject, draft.theme,
+        user.brand_name or user.name, user.brand_signature)
+    draft.subject, draft.theme = result["subject"], result["theme"]
+    draft.content_json = json.dumps(result["sections"])
+    recips = active_contact_emails(db, user.id)
+    subject = f"[Approve to send — revised v{draft.revision_count}] {draft.subject}"
+    html = _draft_email_html(user, result["sections"], len(recips), draft.theme, draft.subject, draft.id)
 
     tid, mid = handle.send_tracked(user.email, subject, html)
     draft.thread_id, draft.awaiting_msg_id = tid, mid

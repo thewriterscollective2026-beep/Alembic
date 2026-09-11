@@ -73,7 +73,7 @@ Open http://localhost:8000 and click **Sign in with Google**.
 | Categorize + let user choose | `ai_service.categorize_senders`, `templates/onboarding.html` |
 | Daily read + attachments | `gmail_service.fetch_new_from_senders`, `app/attachments.py` |
 | Summarize all | `ai_service.build_summary` (one batched call for all sources) |
-| Research themes (live web search) | `ai_service.build_newsletter_from_summary` / `revise_newsletter` (Claude's `web_search` tool) |
+| Research themes (live web search) | `ai_service.build_summary` (reads sources directly, finds cross-source overlaps/gaps, researches them — this is what the approval email shows) |
 | Repurpose + no-AI rewrite | `ai_service.build_newsletter_from_summary` (see `REPURPOSE_GUIDANCE` / `NO_AI_GUIDANCE`) |
 | Personalized newsletter | `gmail_service.send_personalized` (`{{FIRST_NAME}}` token) |
 | **Review gate before send** | `Draft.stage` (`summary_review` → `email_review` → `sent`), approved by replying to email — see `app/pipeline.py` |

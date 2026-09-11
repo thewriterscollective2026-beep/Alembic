@@ -1,17 +1,18 @@
-"""Claude-powered categorization, summarization, and newsletter repurposing.
+"""Claude-powered categorization, research, and newsletter writing.
 
-The repurpose + "no-AI-writing" guidance below is embedded as prompt text because
-Claude Code *skills* don't run inside a deployed web app. To use the exact wording
-of your own /repurpose and /no-ai skills, paste their text into the two constants
-marked >>> PASTE ... <<< below.
+The repurpose + "no-AI-writing" guidance below is embedded as prompt text (see
+REPURPOSE_GUIDANCE / NO_AI_GUIDANCE) because Claude Code *skills* don't run
+inside a deployed web app - edit those constants directly to change voice/style.
 """
 import json
 import logging
-import re
 import anthropic
+import re
 
 from . import config
+from .database import SessionLocal
 from .email_template import THEMES, DEFAULT_THEME
+from .models import UsageLog
 
 _client = None
 _usage_log = logging.getLogger("ai_service.usage")
@@ -33,10 +34,11 @@ WEB_SEARCH_TOOL = {
 
 def _complete(prompt: str, max_tokens: int = 2000, system: str | None = None,
               tools: list | None = None, model: str | None = None,
-              effort: str | None = None, tag: str = "") -> str:
-    """Call Claude and return the joined visible text. Every call is tagged and
-    its token usage logged (input/output/cache), so spend is measurable instead
-    of guessed - check the `ai_service.usage` logger."""
+              effort: str | None = None, tag: str = "", description: str = "") -> str:
+    """Call Claude and return the joined visible text. Every call is tagged, described,
+    and its token usage recorded - both to the `ai_service.usage` logger (for tailing
+    the console during dev) and to the `usage_logs` DB table (for the /dev/usage page,
+    which is the only real spend visibility this app has - there's no Admin API key)."""
     kwargs = {}
     if tools:
         kwargs["tools"] = tools
@@ -50,15 +52,36 @@ def _complete(prompt: str, max_tokens: int = 2000, system: str | None = None,
         **kwargs,
     )
     u = msg.usage
+    input_tokens, output_tokens = u.input_tokens, u.output_tokens
+    cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
+    cache_write = getattr(u, "cache_creation_input_tokens", 0) or 0
     _usage_log.info(
         "tag=%s model=%s input=%d output=%d cache_read=%d cache_write=%d",
-        tag or "untagged", msg.model, u.input_tokens, u.output_tokens,
-        getattr(u, "cache_read_input_tokens", 0) or 0,
-        getattr(u, "cache_creation_input_tokens", 0) or 0,
+        tag or "untagged", msg.model, input_tokens, output_tokens, cache_read, cache_write,
     )
+    _record_usage(tag, description, msg.model, input_tokens, output_tokens, cache_read, cache_write)
     # Server tool blocks (e.g. web_search_tool_result) are skipped here on purpose -
     # only the model's own writing ends up in the joined text.
     return "".join(block.text for block in msg.content if block.type == "text").strip()
+
+
+def _record_usage(tag, description, model, input_tokens, output_tokens, cache_read, cache_write):
+    """Best-effort DB write for the usage log - must never break the actual call
+    it's recording, so any DB problem here is swallowed, not raised."""
+    db = None
+    try:
+        db = SessionLocal()
+        db.add(UsageLog(
+            tag=tag or "untagged", description=description, model=model,
+            input_tokens=input_tokens, output_tokens=output_tokens,
+            cache_read_tokens=cache_read, cache_write_tokens=cache_write,
+        ))
+        db.commit()
+    except Exception:  # noqa: BLE001
+        _usage_log.exception("failed to write usage log row")
+    finally:
+        if db is not None:
+            db.close()
 
 
 # Distilled from the user's content-repurposing skill (email-format adaptation).
@@ -119,7 +142,9 @@ def categorize_senders(senders: list[dict]) -> dict[str, str]:
         '{"a@x.com":"newsletter","b@y.com":"ai"}'
     )
     try:
-        raw = _complete(prompt, max_tokens=1500, model=config.CLAUDE_MODEL_LIGHT, tag="categorize_senders")
+        raw = _complete(
+            prompt, max_tokens=1500, model=config.CLAUDE_MODEL_LIGHT, tag="categorize_senders",
+            description=f"Classify {len(senders)} onboarding-scan sender(s) into categories")
     except Exception:
         return {s["email"]: "other" for s in senders}  # no credits -> uncategorized
     match = re.search(r"\{.*\}", raw, re.DOTALL)
@@ -138,11 +163,13 @@ def categorize_senders(senders: list[dict]) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 def build_summary(emails: list[dict]) -> str:
-    """Summarize every source email AND merge into ONE digest that covers EVERY
-    source (nothing dropped), framed as the reader's own curated findings.
+    """Read every source newsletter directly and produce ONE research-backed brief -
+    this is where research happens now, not at final-write time. One call for the
+    whole batch (not one call per email + a merge call): same task, far fewer
+    round-trips and no N-times-repeated instruction overhead.
 
-    One call for the whole batch (not one call per email + a merge call) - same
-    task, far fewer round-trips and no N-times-repeated instruction overhead."""
+    The brief itself is what gets emailed for approval, so the research is visible
+    and reviewable before a single word of the final newsletter gets written."""
     sources = []
     for e in emails:
         content = e.get("text", "")
@@ -157,35 +184,38 @@ def build_summary(emails: list[dict]) -> str:
     source_count = len(sources)
     joined = "\n\n".join(sources)
     prompt = (
-        f"Below are {source_count} full newsletter emails. Produce a DEEP-RESEARCH BRIEF "
-        "that I will review before it becomes my newsletter — not a shallow summary.\n\n"
-        "For the brief:\n"
-        f"- Cover EVERY one of the {source_count} sources; merge overlaps, omit none.\n"
-        "- Identify the 3-5 real THEMES running across the sources and organise by theme.\n"
-        "- For each theme: what it's actually about, WHY it matters right now, the concrete "
-        "facts / numbers / names / quotes that back it, and any connection between sources.\n"
-        "- Surface the non-obvious angle or takeaway a smart reader would want.\n"
-        "- Keep the genuinely useful links.\n"
-        "- Write in first person, as MY own researched findings (\"Here's what I dug into...\").\n"
-        "- Plain text with clear theme headers and tight bullets. This is the BRIEF for "
+        f"Below are {source_count} full newsletter emails - different senders, different "
+        "topics/sub-topics, different angles. Read them directly (not a pre-made summary) "
+        "and produce a DEEP-RESEARCH BRIEF that I will review before it becomes my "
+        "newsletter.\n\n"
+        "Work in this order:\n"
+        f"1. Cover EVERY one of the {source_count} sources - read what each is actually "
+        "saying, not just its headline.\n"
+        "2. Identify the 3-5 real THEMES running across them, and for each theme note where "
+        "the sources genuinely TOUCH - where they agree, disagree, or build on each other.\n"
+        "3. Spot the GAPS: a fact, a number, recent development, or angle that matters to "
+        "these themes but that none of the sources covered.\n"
+        "4. Use web search to research those gaps and to verify/strengthen the sources' own "
+        "claims with current, concrete facts, numbers, names, or quotes. This is what makes "
+        "the brief genuinely deep instead of a repackage of what was already in these inboxes "
+        "- search enough to back every major theme with something beyond the sources; don't "
+        "search for things that don't add anything.\n"
+        "5. Write the brief itself: organize by theme, merge overlapping source content, fold "
+        "in what you researched, and surface the non-obvious takeaway a smart reader would "
+        "want. Keep the genuinely useful links (both from sources and from research).\n\n"
+        "Write in first person, as MY own researched findings (\"Here's what I dug into...\"). "
+        "Plain text with clear theme headers and tight bullets. This is the BRIEF for "
         "approval, not the final formatted newsletter.\n\n"
         f"SOURCES:\n{joined}"
     )
-    return _complete(prompt, max_tokens=3000, model=config.CLAUDE_MODEL_LIGHT, tag="build_summary")
-
-
-def revise_summary(current: str, feedback: str) -> str:
-    prompt = (
-        "Revise the SUMMARY below based on the reader's requested changes. Keep the "
-        "same plain-text digest style. Return only the revised summary.\n\n"
-        f"REQUESTED CHANGES:\n{feedback}\n\n"
-        f"CURRENT SUMMARY:\n{current}"
-    )
-    return _complete(prompt, max_tokens=1800, model=config.CLAUDE_MODEL_LIGHT, tag="revise_summary")
+    return _complete(
+        prompt, max_tokens=8192, tools=[WEB_SEARCH_TOOL], effort=config.CLAUDE_WRITER_EFFORT,
+        tag="build_summary",
+        description=f"Research {source_count} source newsletter(s): themes, gaps, web search")
 
 
 # ---------------------------------------------------------------------------
-# 3. Turn an APPROVED summary into the newsletter (+ revise on feedback)
+# 3. Turn a research brief into the newsletter (+ revise on reviewer feedback)
 # ---------------------------------------------------------------------------
 
 def _writer_system(brand_name: str = "", brand_signature: str = "") -> str:
@@ -221,13 +251,10 @@ _EMOJI_RULE = (
     "When in doubt, leave it out.\n"
 )
 
-_RESEARCH_RULE = (
-    "Before writing, use web search to RESEARCH the real themes in the summary below - find "
-    "current, concrete facts, numbers, examples, or developments that go beyond what the "
-    "summary already says. This is what makes the newsletter genuinely new instead of a "
-    "repackage of the source newsletters. Search enough to back at least one solid point per "
-    "major theme; don't pad with searches that don't add anything. If a search turns up "
-    "nothing useful for a theme, proceed with the summary content alone for that theme.\n"
+_ALREADY_RESEARCHED_NOTE = (
+    "The summary below is already a research-backed brief - the facts, numbers, and sources "
+    "in it were found deliberately, not pulled from the source newsletters alone. Your job "
+    "here is to write and structure the newsletter from it, not to research further.\n"
 )
 
 _SECTIONS_SCHEMA_RULE = (
@@ -335,14 +362,15 @@ def build_newsletter_from_summary(summary: str, brand_name: str = "", brand_sign
     prompt = (
         "Using the approved summary below as your starting point, prepare my personal curated "
         "newsletter content, first person (as if I wrote it and I'm sharing what I found).\n"
-        f"{_RESEARCH_RULE}"
+        f"{_ALREADY_RESEARCHED_NOTE}"
         f"{_EMOJI_RULE}"
         f"{_SECTIONS_SCHEMA_RULE}\n"
         f"APPROVED SUMMARY:\n{summary}"
     )
     return _parse_newsletter_response(_complete(
         prompt, max_tokens=8192, system=_writer_system(brand_name, brand_signature),
-        tools=[WEB_SEARCH_TOOL], effort=config.CLAUDE_WRITER_EFFORT, tag="build_newsletter"))
+        effort=config.CLAUDE_WRITER_EFFORT, tag="build_newsletter",
+        description="Write the first newsletter draft from the researched brief"))
 
 
 def revise_newsletter(current_sections: dict, feedback: str, subject: str = "", theme: str = DEFAULT_THEME,
@@ -361,4 +389,5 @@ def revise_newsletter(current_sections: dict, feedback: str, subject: str = "", 
     )
     return _parse_newsletter_response(_complete(
         prompt, max_tokens=8192, system=_writer_system(brand_name, brand_signature),
-        tools=[WEB_SEARCH_TOOL], effort=config.CLAUDE_WRITER_EFFORT, tag="revise_newsletter"))
+        tools=[WEB_SEARCH_TOOL], effort=config.CLAUDE_WRITER_EFFORT, tag="revise_newsletter",
+        description=f"Revise newsletter draft per reviewer feedback: {feedback[:80]!r}"))

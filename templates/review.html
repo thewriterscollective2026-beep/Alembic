@@ -11,7 +11,7 @@
 
 <p class="lead">
   Built from {{ draft.source_count }} source email(s) · {{ draft.revision_count }} revision(s).
-  {% if draft.stage in ["summary_review", "email_review"] %}
+  {% if draft.stage == "review" %}
     <br>Approval happens by <strong>replying to the email in your inbox</strong> — this page is just a read-only view.
   {% elif draft.stage == "sent" %}
     <br>Sent to {{ draft.sent_count }} recipient(s){% if draft.sent_at %} on {{ draft.sent_at.strftime("%b %d, %H:%M") }} UTC{% endif %}.
@@ -19,7 +19,8 @@
 </p>
 
 {% if draft.source_summary %}
-  <h2>Summary</h2>
+  <h2>Research brief</h2>
+  <p class="muted">Internal notes the newsletter below was written from — not itself emailed for approval.</p>
   <div class="preview"><pre style="white-space:pre-wrap;font-family:inherit;margin:0">{{ draft.source_summary }}</pre></div>
 {% endif %}
 

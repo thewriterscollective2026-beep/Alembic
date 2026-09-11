@@ -21,6 +21,11 @@ import html as _html
 import re
 
 GREETING_TOKEN = "{{FIRST_NAME}}"
+# Filled in per-recipient at send time (resend_service.py) with that contact's
+# real one-click unsubscribe link - same pattern as GREETING_TOKEN. Only Resend
+# sends resolve it; drafts/previews sent to the client show the literal token,
+# same as {{FIRST_NAME}} does everywhere except the real final send.
+UNSUBSCRIBE_TOKEN = "{{UNSUBSCRIBE_URL}}"
 INK = "#201e1d"
 MUTED = "#6e6659"
 LINE = "#dbcfb8"
@@ -279,7 +284,9 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
     headline = subject or sections.get("headline") or "Your newsletter"
     now = _dt.datetime.utcnow()
     date_str = issue_date or f"{now:%A}, {now.day} {now:%B %Y}"
-    unsub = unsubscribe_url.strip() or (f"mailto:{from_email}?subject=Unsubscribe" if from_email else "#")
+    # Default to the per-recipient placeholder (resend_service.py fills in the real
+    # signed link at send time); an explicit unsubscribe_url always wins if passed.
+    unsub = unsubscribe_url.strip() or UNSUBSCRIBE_TOKEN
     address_line = f'<br>{_e(address)}' if address.strip() else ""
     preheader = _preheader_text(sections)
     preheader_pad = "&nbsp;&zwnj;" * 40

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-split">
+  <h1>Claude usage log</h1>
+</div>
+<p class="lead">
+  Every call this app made to Claude, most recent first (last 300) — for development
+  visibility, since there's no Admin API key on this deployment. Each row is one API call.
+</p>
+
+<div class="cards">
+  <div class="card"><h3>{{ totals.input }}</h3><p>Input tokens</p></div>
+  <div class="card"><h3>{{ totals.output }}</h3><p>Output tokens</p></div>
+  <div class="card"><h3>{{ totals.cache_read }}</h3><p>Cache read tokens</p></div>
+  <div class="card"><h3>{{ totals.cache_write }}</h3><p>Cache write tokens</p></div>
+</div>
+
+<h2>Calls</h2>
+{% if rows %}
+<div style="overflow-x:auto">
+<table class="tbl">
+  <thead>
+    <tr>
+      <th>Time (UTC)</th>
+      <th>Call</th>
+      <th>Why</th>
+      <th>Model</th>
+      <th style="text-align:right">Input</th>
+      <th style="text-align:right">Output</th>
+      <th style="text-align:right">Cache read</th>
+      <th style="text-align:right">Cache write</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td style="white-space:nowrap;font-family:monospace;font-size:12px">{{ r.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+      <td><span class="pill on">{{ r.tag }}</span></td>
+      <td style="max-width:360px">{{ r.description }}</td>
+      <td style="font-family:monospace;font-size:12px">{{ r.model }}</td>
+      <td style="text-align:right;font-family:monospace">{{ r.input_tokens }}</td>
+      <td style="text-align:right;font-family:monospace">{{ r.output_tokens }}</td>
+      <td style="text-align:right;font-family:monospace">{{ r.cache_read_tokens }}</td>
+      <td style="text-align:right;font-family:monospace">{{ r.cache_write_tokens }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">No calls logged yet — trigger a run and refresh this page.</p>
+{% endif %}
+{% endblock %}

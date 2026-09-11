@@ -7,8 +7,13 @@
   <p class="hint">Upload an <strong>.xlsx</strong> file of recipient emails. The tool pulls every
   email address it finds — any column, with or without a header.</p>
   <p class="muted">
-    {% if recipient_count %}Currently <strong>{{ recipient_count }}</strong> recipient(s) loaded
-      {% if user.recipients_file %}from <code>{{ user.recipients_file }}</code>{% endif %}.
+    {% if contact_counts.active or contact_counts.bounced or contact_counts.unsubscribed or contact_counts.complained %}
+      <strong>{{ contact_counts.active }}</strong> active recipient(s)
+      {% if user.recipients_file %}(last upload: <code>{{ user.recipients_file }}</code>){% endif %}.
+      {% if contact_counts.unsubscribed %}<br>{{ contact_counts.unsubscribed }} unsubscribed (suppressed).{% endif %}
+      {% if contact_counts.bounced %}<br>{{ contact_counts.bounced }} bounced (suppressed).{% endif %}
+      {% if contact_counts.complained %}<br>{{ contact_counts.complained }} marked as spam (suppressed).{% endif %}
+      <br>Re-uploading adds new emails — it never re-activates a suppressed contact.
     {% else %}No recipients uploaded yet.{% endif %}
   </p>
   <form method="post" action="/settings/recipients" enctype="multipart/form-data" class="form">
@@ -59,7 +64,7 @@
 
     <label class="field">
       <span class="label">Run time (UTC hour)</span>
-      <span class="hint">The hour a run starts and emails you the summary. Morning is best so newsletters have arrived.</span>
+      <span class="hint">The hour a run starts and emails you the drafted newsletter. Morning is best so newsletters have arrived.</span>
       <select name="run_hour">
         {% for h in hours %}
           <option value="{{ h }}" {% if user.run_hour == h %}selected{% endif %}>{{ "%02d:00"|format(h) }} UTC</option>
@@ -73,9 +78,21 @@
     </label>
   </section>
 
+  <section class="group">
+    <h2>Sending domain warm-up</h2>
+    <p class="hint">Leave at 0 for normal sending. Set this for the <strong>first</strong>
+    campaign on a fresh sending domain only — it caps that send to the first N active
+    contacts, so you can ramp up gradually instead of sending to everyone on day one. Set
+    back to 0 once the domain is warmed up.</p>
+    <label class="field">
+      <span class="label">Limit next send to</span>
+      <input type="number" name="warmup_limit" min="0" value="{{ user.warmup_limit }}" placeholder="0 = no limit">
+    </label>
+  </section>
+
   <button class="btn" type="submit">Save settings</button>
 </form>
 
-<p class="note">Every run emails you first (summary, then draft). Nothing sends to your list
-until you reply <strong>APPROVED</strong> to the draft email.</p>
+<p class="note">Every run researches your newsletters and emails you the finished draft first.
+Nothing sends to your list until you reply <strong>APPROVED</strong> to that email.</p>
 {% endblock %}
