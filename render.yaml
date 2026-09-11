@@ -1,0 +1,59 @@
+# Render Blueprint - https://render.com/docs/blueprint-spec
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo -> Render reads
+# this file and proposes the service below. Secrets (sync: false) are NOT stored
+# here - Render prompts for each one in the dashboard on first deploy.
+#
+# Needs a paid instance type (not Free) because of the attached disk below -
+# SQLite (data/app.db) needs persistent storage or every deploy wipes it.
+services:
+  - type: web
+    name: alembic
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /
+    disk:
+      name: alembic-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      # --- Google OAuth ---
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: OAUTH_REDIRECT_URI
+        sync: false  # must be https://<your-render-url>/auth/callback, added to the
+                      # Google Cloud OAuth client's Authorized redirect URIs too
+      # --- Anthropic / Claude ---
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-5
+      - key: CLAUDE_MODEL_LIGHT
+        value: claude-haiku-4-5
+      - key: CLAUDE_WRITER_EFFORT
+        value: medium
+      - key: WEB_SEARCH_MAX_USES
+        value: "4"
+      # --- App secrets ---
+      - key: SESSION_SECRET
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      # --- Scan tuning ---
+      - key: SCAN_DAYS
+        value: "60"
+      - key: SCAN_MESSAGE_LIMIT
+        value: "400"
+      # --- Resend (bulk sending) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # --- Public base URL of this service, for the unsubscribe link ---
+      - key: APP_BASE_URL
+        sync: false  # must be https://<your-render-url> (no trailing slash)

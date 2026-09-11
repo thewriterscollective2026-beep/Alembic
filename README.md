@@ -105,11 +105,37 @@ Edit them directly to change tone/style rules; sensible defaults are already in 
 
 ## Deployment
 
-A `Dockerfile` and `Procfile` are included so this runs the same way on most hosts:
+**Render is the intended host** — this app needs an always-on process (the in-process
+scheduler polls for approval replies every few minutes) and a persistent local disk for
+SQLite, neither of which a serverless platform (e.g. Vercel) supports without a rewrite.
+
+### Render (recommended)
+
+`render.yaml` is a Blueprint — Render dashboard → **New → Blueprint** → pick this repo →
+Render proposes the `alembic` web service from that file (Docker build, health check,
+persistent disk mounted at `/app/data` for `data/app.db`). It prompts you to fill in every
+`sync: false` secret in the dashboard (Google/Anthropic/Resend keys, `SESSION_SECRET`,
+`FERNET_KEY`) — none of those live in the repo. **Needs a paid instance type**, not Free,
+because Free-tier Render services can't have an attached disk.
+
+After the first deploy, using the assigned `https://<service>.onrender.com` URL (or a custom
+domain once attached):
+- Set `OAUTH_REDIRECT_URI` to `https://<service>.onrender.com/auth/callback` — and add that
+  exact URL to the Google Cloud OAuth client's Authorized redirect URIs.
+- Set `APP_BASE_URL` to `https://<service>.onrender.com` (no trailing slash) — this is what
+  the one-click unsubscribe links resolve against.
+- If using Resend webhooks, point the Resend webhook endpoint at
+  `https://<service>.onrender.com/webhooks/resend` and put its signing secret in
+  `RESEND_WEBHOOK_SECRET`.
+
+### Other Docker hosts
+
+A plain `Dockerfile` and `Procfile` are also included, so this runs the same way on any
+host that supports a long-running container (Railway, Fly.io, a VPS):
 
 ```bash
-docker build -t newsletter-repurposer .
-docker run -p 8000:8000 --env-file .env newsletter-repurposer
+docker build -t alembic .
+docker run -p 8000:8000 --env-file .env alembic
 ```
 
 Notes for any production host:
@@ -118,5 +144,4 @@ Notes for any production host:
   `Dockerfile`/`Procfile` already invoke plain `uvicorn`.
 - `data/app.db` (SQLite) needs a **persistent volume** if the host's filesystem is
   ephemeral (most PaaS containers are) — otherwise every redeploy wipes user data.
-- `OAUTH_REDIRECT_URI` must be updated to the deployed HTTPS URL and added as an
-  Authorized redirect URI in the Google Cloud OAuth client.
+- `OAUTH_REDIRECT_URI` / `APP_BASE_URL` must be updated to the deployed HTTPS URL (see above).
