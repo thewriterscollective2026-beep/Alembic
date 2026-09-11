@@ -1,11 +1,15 @@
-"""SQLAlchemy engine + session helpers (SQLite), with a tiny auto-migration."""
+"""SQLAlchemy engine + session helpers (SQLite locally, Postgres in production
+via DATABASE_URL - see config.py), with a tiny auto-migration."""
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from . import config
 
+_is_sqlite = config.DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     config.DATABASE_URL,
-    connect_args={"check_same_thread": False},  # allow scheduler-thread access
+    # check_same_thread is a SQLite-only connect arg (needed so the in-process
+    # scheduler thread can share the engine); Postgres doesn't accept it.
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
     future=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)

@@ -71,10 +71,15 @@ RESEND_WEBHOOK_SECRET = os.getenv("RESEND_WEBHOOK_SECRET", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
 # --- Storage ---
+# Local dev defaults to a SQLite file. In production, set DATABASE_URL to a
+# hosted Postgres connection string (e.g. Neon's free tier) - needed on hosts
+# without a persistent disk (Render's free tier, for one), since SQLite would
+# otherwise lose all data on every redeploy/restart. Any Postgres URL works;
+# nothing in this app is SQLite-specific beyond this default.
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "app.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 
 def missing_required():

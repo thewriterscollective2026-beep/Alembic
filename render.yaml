@@ -3,21 +3,26 @@
 # this file and proposes the service below. Secrets (sync: false) are NOT stored
 # here - Render prompts for each one in the dashboard on first deploy.
 #
-# Needs a paid instance type (not Free) because of the attached disk below -
-# SQLite (data/app.db) needs persistent storage or every deploy wipes it.
+# FREE TIER, current setup: `plan: free` has no persistent disk, so this uses a
+# hosted Postgres (e.g. Neon's free tier - neon.tech) via DATABASE_URL instead
+# of SQLite+disk. Free services also sleep after 15 min idle and wake on the
+# next request (~1 min cold start) - the in-process scheduler (auto sends,
+# reply polling) does not run while asleep; the manual "Run now"/"Check
+# replies now" buttons still work fine once the service is awake. Fine for
+# testing; move to a paid plan (add a `disk:` block back, or keep Postgres and
+# just bump `plan:`) once you need reliable unattended scheduling.
 services:
   - type: web
     name: alembic
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
     autoDeploy: true
     healthCheckPath: /
-    disk:
-      name: alembic-data
-      mountPath: /app/data
-      sizeGB: 1
     envVars:
+      # --- Database (Postgres - e.g. Neon's free tier connection string) ---
+      - key: DATABASE_URL
+        sync: false
       # --- Google OAuth ---
       - key: GOOGLE_CLIENT_ID
         sync: false

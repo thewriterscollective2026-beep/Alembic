@@ -112,11 +112,20 @@ SQLite, neither of which a serverless platform (e.g. Vercel) supports without a 
 ### Render (recommended)
 
 `render.yaml` is a Blueprint — Render dashboard → **New → Blueprint** → pick this repo →
-Render proposes the `alembic` web service from that file (Docker build, health check,
-persistent disk mounted at `/app/data` for `data/app.db`). It prompts you to fill in every
-`sync: false` secret in the dashboard (Google/Anthropic/Resend keys, `SESSION_SECRET`,
-`FERNET_KEY`) — none of those live in the repo. **Needs a paid instance type**, not Free,
-because Free-tier Render services can't have an attached disk.
+Render proposes the `alembic` web service from that file (Docker build, health check). It
+prompts you to fill in every `sync: false` secret in the dashboard (Google/Anthropic/Resend
+keys, `SESSION_SECRET`, `FERNET_KEY`, `DATABASE_URL`) — none of those live in the repo.
+
+**Currently configured for Render's free tier**, which has two real consequences:
+- No persistent disk on free services, so this uses a hosted Postgres (`DATABASE_URL`) instead
+  of SQLite — a free instance on [neon.tech](https://neon.tech) works well. Create one, copy
+  its connection string, paste it into Render's `DATABASE_URL` field.
+- Free services sleep after 15 minutes idle and wake on the next request (~1 min cold start).
+  The in-process scheduler (automatic sends on schedule, reply polling) doesn't run while
+  asleep — the manual **Run now** / **Check replies now** buttons still work fine once the
+  service is awake. Fine for testing; move to a paid plan (`plan: starter` or higher in
+  `render.yaml`, optionally adding back a `disk:` block instead of Postgres) once you need
+  reliable unattended scheduling.
 
 After the first deploy, using the assigned `https://<service>.onrender.com` URL (or a custom
 domain once attached):

@@ -145,13 +145,17 @@ plan, not yet built as of this writing).
 - `Draft` — one pipeline run; see the stage lifecycle in its docstring and in "The
   email-approval pipeline" above.
 
-`app/database.py` runs a small hand-rolled auto-migration (`_migrate()`) on startup that adds
-missing columns to an existing SQLite `data/app.db` — when adding a column to `User` or
-`Draft`, add the corresponding `ALTER TABLE` there too (there's no migration *framework* here
-despite the project's own name — no Alembic-the-tool, just this hand-rolled function). Brand
-new tables (like `Contact`/`Campaign`/`CampaignRecipient`/`UsageLog`) don't need an `ALTER
-TABLE` entry — `Base.metadata.create_all()` in `init_db()` creates any missing table
-automatically.
+**Database:** SQLite locally by default (`data/app.db`); production sets `DATABASE_URL` to a
+hosted Postgres connection string instead (e.g. Neon's free tier) — needed on hosts without a
+persistent disk, like Render's free plan, or every redeploy wipes all data. `app/database.py`
+picks the dialect from the URL (`_is_sqlite`); the plain `ALTER TABLE ... ADD COLUMN` SQL in
+`_migrate()` is valid on both, so no dialect branching was needed there. `app/database.py`
+runs this small hand-rolled auto-migration on startup that adds missing columns to an
+existing DB — when adding a column to `User` or `Draft`, add the corresponding `ALTER TABLE`
+there too (there's no migration *framework* here despite the project's own name — no
+Alembic-the-tool, just this hand-rolled function). Brand new tables (like
+`Contact`/`Campaign`/`CampaignRecipient`/`UsageLog`) don't need an `ALTER TABLE` entry —
+`Base.metadata.create_all()` in `init_db()` creates any missing table automatically.
 
 ### Other modules
 
