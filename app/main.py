@@ -377,9 +377,12 @@ def poll_now(request: Request, db: Session = Depends(get_session)):
     user = require_user(request, db)
     result = poll_run_replies(user.id)
     acted = result.get("acted") or []
-    request.session["flash"] = (
-        f"Checked replies — {len(acted)} update(s): {[a[1] for a in acted]}" if acted
-        else "Checked replies — nothing new yet.")
+    if not result.get("ok"):
+        request.session["flash"] = f"Check replies failed: {result.get('reason')}"
+    elif acted:
+        request.session["flash"] = f"Checked replies — {len(acted)} update(s): {[a[1] for a in acted]}"
+    else:
+        request.session["flash"] = "Checked replies — nothing new yet."
     return RedirectResponse("/", status_code=303)
 
 
