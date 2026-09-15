@@ -182,10 +182,15 @@ Alembic-the-tool, just this hand-rolled function). Brand new tables (like
   summarization.
 - `app/excel_recipients.py` — pulls every email-looking string out of an uploaded `.xlsx`,
   cell-by-cell, regardless of column layout.
-- `app/email_template.py` — renders `Draft.content_json`'s structured sections into the
-  branded, email-safe editorial layout (masthead, numbered highlights, feature story, story
-  cards, quote, further reading) in one of three color `THEMES`, used for both the real send
-  and the review-email preview. No photos/illustrations by design — see its module docstring.
+- `app/email_template.py` — renders `Draft.content_json`'s structured sections into a
+  branded, email-safe layout (numbered highlights, feature story, story cards, quote,
+  further reading), used for both the real send and the review-email preview. No
+  photos/illustrations by design — see its module docstring. Two independent axes:
+  `theme` (`tech`/`business`/`general`, one of the color `THEMES`, picked per issue by
+  Claude) and `layout` (`editorial` dark masthead, or `banner` — light masthead with
+  wordmark, author byline via a CSS initial-circle avatar, optional sponsor strip
+  scaffold, social-icon footer — a per-user structural choice, `User.newsletter_layout`,
+  set once in Settings, not decided by Claude).
 
 ## Notes worth remembering
 

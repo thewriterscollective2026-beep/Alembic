@@ -29,6 +29,10 @@ class User(Base):
     brand_signature: Mapped[str] = mapped_column(Text, default="")         # sign-off block, e.g. name, title, company, link
     subscribe_url: Mapped[str] = mapped_column(String(512), default="")    # link for the Subscribe button
     business_address: Mapped[str] = mapped_column(String(512), default="") # footer address (bulk-email compliance)
+    # Structural template ("editorial" default / "banner" - masthead+author-byline
+    # style, see email_template.py) - distinct from `theme` (color only), which
+    # Claude still picks per issue.
+    newsletter_layout: Mapped[str] = mapped_column(String(20), default="editorial")
     schedule_active: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

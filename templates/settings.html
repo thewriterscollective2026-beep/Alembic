@@ -47,6 +47,14 @@
       <span class="hint">Shown in the footer — required by law for bulk email.</span>
       <input type="text" name="business_address" value="{{ user.business_address }}" placeholder="Irizpro Learning Solutions, City, Country">
     </label>
+    <label class="field">
+      <span class="label">Layout</span>
+      <span class="hint">Overall structure of the newsletter — colors are still picked automatically per issue.</span>
+      <select name="newsletter_layout">
+        <option value="editorial" {% if user.newsletter_layout != 'banner' %}selected{% endif %}>Editorial — dark masthead</option>
+        <option value="banner" {% if user.newsletter_layout == 'banner' %}selected{% endif %}>Banner — logo + author byline</option>
+      </select>
+    </label>
   </section>
 
   <section class="group">

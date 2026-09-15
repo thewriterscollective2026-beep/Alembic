@@ -106,6 +106,8 @@ def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft
         theme=theme,
         subject=subject,
         issue_number=f"Issue #{draft_id}" if draft_id else "",
+        layout=user.newsletter_layout,
+        author_name=user.brand_name or user.name,
     )
 
 

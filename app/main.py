@@ -278,6 +278,7 @@ def save_settings(
     brand_signature: str = Form(""),
     subscribe_url: str = Form(""),
     business_address: str = Form(""),
+    newsletter_layout: str = Form("editorial"),
     warmup_limit: int = Form(0),
     db: Session = Depends(get_session),
 ):
@@ -289,6 +290,7 @@ def save_settings(
     user.brand_signature = brand_signature.strip()
     user.subscribe_url = subscribe_url.strip()
     user.business_address = business_address.strip()
+    user.newsletter_layout = newsletter_layout if newsletter_layout in ("editorial", "banner") else "editorial"
     user.warmup_limit = max(0, int(warmup_limit))
     db.commit()
 
@@ -342,6 +344,7 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
             subscribe_url=user.subscribe_url, address=user.business_address,
             from_email=user.email, theme=draft.theme, subject=draft.subject,
             issue_number=f"Issue #{draft.id}",
+            layout=user.newsletter_layout, author_name=user.brand_name or user.name,
         )
     return templates.TemplateResponse("review.html", {
         "request": request, "user": user, "draft": draft, "rendered_html": rendered_html,

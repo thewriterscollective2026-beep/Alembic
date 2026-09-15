@@ -16,6 +16,21 @@ Three color THEMES are variants of this one structural layout - the newsletter-
 writing prompt in ai_service.py picks one per issue based on its dominant topic.
 The {{FIRST_NAME}} token is rendered directly into the greeting by this module
 (not authored by the model) and is filled in per-recipient at send time.
+
+Two structural LAYOUTS share that same THEMES palette and the same content-section
+renderers (note/summary/feature/stories/quote/further_reading/signature) - only the
+masthead and footer differ:
+  - "editorial" (default): dark full-bleed masthead, the original design.
+  - "banner": light utility-bar + centered wordmark + author byline masthead,
+    modeled on a Substack/Beehiiv-style newsletter (date + "read online",
+    brand wordmark, headline, emoji-flagged kicker, author avatar+name, an
+    optional sponsor strip, and a social-icon footer bar). The author avatar is
+    a CSS-drawn initial circle (no image asset), consistent with this module's
+    no-photos design. The sponsor strip is scaffolding for a future ad-sales
+    feature - pass `sponsor` to render it; omitted (None) by default, so it's
+    invisible until that feature is built.
+`User.newsletter_layout` picks the layout (a brand/structural choice, set once
+in Settings) - unlike `theme` (color), which Claude still picks per issue.
 """
 import html as _html
 import re
@@ -98,6 +113,108 @@ def _masthead(t: dict, kicker: str, issue_number: str, headline: str,
         line-height:20px;color:#c9bda8">{_e(issue_date)} &nbsp;&middot;&nbsp; {_e(issue_tagline)}</td></tr>
     </table>
   </td></tr>"""
+
+
+def _initial_avatar(t: dict, name: str, size: int = 44) -> str:
+    """CSS-drawn circle with the author's first initial - stands in for a photo
+    avatar without needing an image asset (see module docstring)."""
+    initial = (name or "?").strip()[:1].upper() or "?"
+    return (
+        f'<td width="{size}" style="width:{size}px;height:{size}px;border-radius:50%;'
+        f'background-color:{t["accent"]};font-family:Arial,Helvetica,sans-serif;'
+        f'font-size:{int(size*0.42)}px;line-height:{size}px;color:#ffffff;font-weight:bold;'
+        f'text-align:center" align="center" valign="middle">{_e(initial)}</td>'
+    )
+
+
+def _banner_masthead(t: dict, brand_name: str, label: str, emoji: str, issue_date: str,
+                      headline: str, issue_tagline: str, author_name: str,
+                      read_online_url: str, sponsor: dict | None) -> str:
+    read_online = ""
+    if read_online_url.strip():
+        read_online = (f' &nbsp;|&nbsp; <a class="nl-link" href="{_html.escape(read_online_url)}" '
+                       f'style="color:{t["accent"]};text-decoration:underline">Read online</a>')
+    sponsor_html = ""
+    if sponsor and sponsor.get("name"):
+        sponsor_label = _e(sponsor.get("label") or "In partnership with")
+        sponsor_html = f"""
+      {_row_spacer(26)}
+      <tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;
+        line-height:16px;color:{MUTED}">{sponsor_label}</td></tr>
+      {_row_spacer(6)}
+      <tr><td align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:19px;
+        line-height:24px;color:{INK};font-weight:bold">{_e(sponsor['name'])}</td></tr>"""
+    return f"""
+  <tr><td class="nl-pad nl-fade" style="padding:24px 40px 30px 40px;background-color:{t['card_alt']};
+    border-bottom:1px solid {LINE}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;
+          line-height:18px;color:{MUTED}">{_e(issue_date)}{read_online}</td>
+      </tr>
+      {_row_spacer(22)}
+      <tr><td align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:30px;
+        line-height:34px;color:{t['accent']};font-weight:bold">{_e(brand_name or 'Newsletter')}</td></tr>
+      <tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
+        line-height:18px;letter-spacing:.22em;text-transform:uppercase;color:{INK};
+        font-weight:bold">{_e(label)}</td></tr>
+      {_row_spacer(26)}
+      <tr><td align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:24px;
+        line-height:31px;color:{INK}">{_e(emoji)}&nbsp; {_e(headline)}</td></tr>
+      {_row_spacer(10) if issue_tagline.strip() else ""}
+      {f'<tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:{MUTED}">{_e(issue_tagline)}</td></tr>' if issue_tagline.strip() else ""}
+      {_row_spacer(20)}
+      <tr><td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          {_initial_avatar(t, author_name)}
+          <td width="10" style="width:10px">&nbsp;</td>
+          <td valign="middle" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;
+            line-height:18px;color:{INK};font-weight:bold">{_e(author_name or brand_name)}</td>
+        </tr></table>
+      </td></tr>
+      {sponsor_html}
+    </table>
+  </td></tr>"""
+
+
+def _banner_footer(t: dict, brand_name: str, address_line: str, unsub: str,
+                    social_links: dict | None) -> str:
+    social_html = ""
+    social_links = social_links or {}
+    labels = {"instagram": "IG", "youtube": "YT", "linkedin": "in", "twitter": "X", "x": "X"}
+    icons = "".join(
+        f'<td style="padding:0 6px"><a href="{_html.escape(url)}" '
+        f'style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;'
+        f'background-color:{t["dark"]};color:#ffffff;font-family:Arial,Helvetica,sans-serif;'
+        f'font-size:11px;font-weight:bold;text-align:center;text-decoration:none">'
+        f'{labels.get(key, key[:2].upper())}</a></td>'
+        for key, url in social_links.items() if url
+    )
+    if icons:
+        social_html = f"""
+      <tr><td align="center" style="padding-bottom:20px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>{icons}</tr></table>
+      </td></tr>"""
+    return f"""
+  <tr><td class="nl-pad" style="padding:30px 40px 36px 40px;background-color:{t['card_alt']};
+    border-top:1px solid {LINE}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      {social_html}
+      <tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;
+        line-height:20px;color:{MUTED}">
+        Update your email preferences or
+        <a class="nl-link" href="{_html.escape(unsub)}" style="color:{t['accent']};text-decoration:underline">unsubscribe</a>
+      </td></tr>
+      {_row_spacer(10)}
+      <tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;
+        line-height:20px;color:{MUTED}">&copy; {_e(_dt_year())} {_e(brand_name or 'Newsletter')}{address_line}</td></tr>
+    </table>
+  </td></tr>"""
+
+
+def _dt_year() -> str:
+    import datetime as _dt
+    return str(_dt.datetime.utcnow().year)
 
 
 def _note_section(t: dict, note: str) -> str:
@@ -275,8 +392,15 @@ def _signature_section(t: dict, brand_signature: str) -> str:
 def render_email(sections: dict, *, brand_name: str = "", brand_signature: str = "",
                  subscribe_url: str = "", unsubscribe_url: str = "", address: str = "",
                  from_email: str = "", theme: str = DEFAULT_THEME, issue_number: str = "",
-                 subject: str = "", issue_date: str = "") -> str:
-    """Return a full, styled HTML email built from structured `sections` data."""
+                 subject: str = "", issue_date: str = "", layout: str = "editorial",
+                 author_name: str = "", read_online_url: str = "",
+                 sponsor: dict | None = None, social_links: dict | None = None) -> str:
+    """Return a full, styled HTML email built from structured `sections` data.
+
+    `layout` picks the masthead/footer structure ("editorial" or "banner" - see
+    module docstring); `author_name`, `read_online_url`, `sponsor`, `social_links`
+    only affect the "banner" layout and are all optional/no-op on "editorial".
+    """
     import datetime as _dt
     t = _theme(theme)
     sections = sections or {}
@@ -290,6 +414,7 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
     address_line = f'<br>{_e(address)}' if address.strip() else ""
     preheader = _preheader_text(sections)
     preheader_pad = "&nbsp;&zwnj;" * 40
+    is_banner = (layout or "").lower() == "banner"
 
     body_sections = "".join([
         _note_section(t, sections.get("note", "")),
@@ -300,6 +425,30 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
         _further_reading_section(t, sections.get("further_reading") or []),
         _signature_section(t, brand_signature),
     ])
+
+    if is_banner:
+        masthead_html = _banner_masthead(
+            t, brand_name, t["label"], t["emoji"], date_str, headline,
+            sections.get("issue_tagline", ""), author_name or brand_name,
+            read_online_url, sponsor,
+        )
+        footer_html = _banner_footer(t, brand_name, address_line, unsub, social_links)
+    else:
+        masthead_html = _masthead(t, kicker, issue_number, headline, date_str, sections.get("issue_tagline", ""))
+        footer_html = f"""
+  <tr><td class="nl-pad" style="padding:34px 40px 36px 40px;background-color:{t['card_alt']};border-top:1px solid {LINE}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:22px;color:{MUTED}">
+        You're receiving this because you subscribed to updates from {_e(brand_name or from_email or 'us')}.</td></tr>
+      {_row_spacer(16)}
+      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:20px;color:{MUTED}">
+        <strong style="color:{INK}">{_e(brand_name or 'Newsletter')}</strong>{address_line}<br>
+        <a class="nl-link" href="{_html.escape(unsub)}" style="color:{t['accent']};text-decoration:underline">Unsubscribe</a>
+        &nbsp;&middot;&nbsp;
+        <a class="nl-link" href="{_html.escape(subscribe_url or '#')}" style="color:{t['accent']};text-decoration:underline">Subscribe</a>
+      </td></tr>
+    </table>
+  </td></tr>"""
 
     return f"""\
 <!-- Alembic by IrizPro -->
@@ -331,23 +480,11 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
   style="width:600px;max-width:600px;background-color:{t['card']};border-radius:16px;overflow:hidden;
   box-shadow:0 12px 34px rgba(32,30,29,.10)">
 
-{_masthead(t, kicker, issue_number, headline, date_str, sections.get('issue_tagline', ''))}
+{masthead_html}
 {body_sections}
 
   <!-- footer -->
-  <tr><td class="nl-pad" style="padding:34px 40px 36px 40px;background-color:{t['card_alt']};border-top:1px solid {LINE}">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:22px;color:{MUTED}">
-        You're receiving this because you subscribed to updates from {_e(brand_name or from_email or 'us')}.</td></tr>
-      {_row_spacer(16)}
-      <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:20px;color:{MUTED}">
-        <strong style="color:{INK}">{_e(brand_name or 'Newsletter')}</strong>{address_line}<br>
-        <a class="nl-link" href="{_html.escape(unsub)}" style="color:{t['accent']};text-decoration:underline">Unsubscribe</a>
-        &nbsp;&middot;&nbsp;
-        <a class="nl-link" href="{_html.escape(subscribe_url or '#')}" style="color:{t['accent']};text-decoration:underline">Subscribe</a>
-      </td></tr>
-    </table>
-  </td></tr>
+{footer_html}
 
 </table>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px">
