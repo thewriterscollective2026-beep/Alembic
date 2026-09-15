@@ -106,7 +106,7 @@ def _note_section(t: dict, note: str) -> str:
     return f"""
   <tr><td class="nl-pad nl-fade nl-d1" style="padding:34px 40px 6px 40px;background-color:{t['card']}">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      {_eyebrow("From the desk", t['accent2'])}
+      {_eyebrow("This issue", t['accent2'])}
       <tr><td style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:30px;
         color:{INK}">Hi {GREETING_TOKEN},</td></tr>
       {_row_spacer(10)}

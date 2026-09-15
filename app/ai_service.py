@@ -220,9 +220,13 @@ def build_summary(emails: list[dict]) -> str:
         "5. Write the brief itself: organize by theme, merge overlapping source content, fold "
         "in what you researched, and surface the non-obvious takeaway a smart reader would "
         "want. Keep the genuinely useful links (both from sources and from research).\n\n"
-        "Write in first person, as MY own researched findings (\"Here's what I dug into...\"). "
-        "Plain text with clear theme headers and tight bullets. This is the BRIEF for "
-        "approval, not the final formatted newsletter.\n\n"
+        "Write this as an internal research brief on the TOPICS/THEMES themselves - state "
+        "findings directly (\"Free-tier friction is becoming standard because...\"), not as a "
+        "personal account of reading/discovering these particular source emails (\"here's "
+        "what I dug into\", \"reading my inbox\"). This brief's own framing carries through to "
+        "the final newsletter, so keep it topic-first here too. Plain text with clear theme "
+        "headers and tight bullets. This is the BRIEF for approval, not the final formatted "
+        "newsletter.\n\n"
         f"SOURCES:\n{joined}"
     )
     return _complete(
@@ -274,6 +278,21 @@ _ALREADY_RESEARCHED_NOTE = (
     "here is to write and structure the newsletter from it, not to research further.\n"
 )
 
+_NO_PROCESS_NARRATION_RULE = (
+    "Never narrate how this newsletter was produced or where its material came from. "
+    "Specifically forbidden anywhere in your output: mentioning an inbox, emails you "
+    "'received'/'got'/'found'/'almost archived', reading or scanning mail, comparing emails "
+    "'side by side', a 'rabbit hole' framing, 'this round', research tools, searches, or any "
+    "other reference to the sourcing/research process. This is a newsletter about a topic, "
+    "not a diary of how you researched it. Present findings directly, like an analyst who "
+    "already knows the subject - companies/products you discuss are examples or case studies "
+    "you're citing, never 'things that landed in my inbox'. This applies to every field, "
+    "especially \"note\" and \"issue_tagline\" - both must name/frame the issue's TOPIC, not "
+    "the research process behind it. First-person opinion is still fine (\"I think the real "
+    "story here is...\") - it's the sourcing mechanism that must stay invisible, not your "
+    "voice.\n"
+)
+
 _SECTIONS_SCHEMA_RULE = (
     "Respond in EXACTLY this format, three parts in order:\n"
     "THEME: <theme>\n"
@@ -289,9 +308,11 @@ _SECTIONS_SCHEMA_RULE = (
     "The JSON object has this exact shape (all text fields are PLAIN TEXT, no HTML tags - the "
     "template supplies every tag and link):\n"
     "{\n"
-    '  "issue_tagline": "short phrase, 4-8 words, describing this issue\'s focus",\n'
-    '  "note": "2-4 sentence opening from you to the reader, first person, no greeting line "\n'
-    '          "(the template renders the greeting itself) - what you found and why it matters",\n'
+    '  "issue_tagline": "short phrase, 4-8 words, naming this issue\'s TOPIC (e.g. \'Free-tier '
+    'growth tactics, decoded\') - never a phrase about reading mail or researching",\n'
+    '  "note": "2-4 sentence opening that states the topic and your thesis directly - first "\n'
+    '          "person opinion is fine, narrating how you researched it is not; no greeting "\n'
+    '          "line, the template renders the greeting itself",\n'
     '  "summary_points": ["3-5 short, scannable highlights from this issue"],\n'
     '  "feature": {\n'
     '    "category": "1-2 word label for the lead story\'s topic",\n'
@@ -378,8 +399,10 @@ def _parse_newsletter_response(raw: str) -> dict:
 def build_newsletter_from_summary(summary: str, brand_name: str = "", brand_signature: str = "") -> dict:
     prompt = (
         "Using the approved summary below as your starting point, prepare my personal curated "
-        "newsletter content, first person (as if I wrote it and I'm sharing what I found).\n"
+        "newsletter content about the topic(s) it covers, first person, as an analyst who "
+        "already knows this subject writing directly to their audience.\n"
         f"{_ALREADY_RESEARCHED_NOTE}"
+        f"{_NO_PROCESS_NARRATION_RULE}"
         f"{_EMOJI_RULE}"
         f"{_SECTIONS_SCHEMA_RULE}\n"
         f"APPROVED SUMMARY:\n{summary}"
@@ -396,6 +419,7 @@ def revise_newsletter(current_sections: dict, feedback: str, subject: str = "", 
         "Revise the newsletter content below based on my requested changes. If the changes "
         "call for new or more current information, use web search to find it - real facts and "
         "URLs only, never invented ones.\n"
+        f"{_NO_PROCESS_NARRATION_RULE}"
         f"{_EMOJI_RULE}"
         f"Keep THEME as '{theme}' unless the requested changes clearly call for a different "
         f"topic focus — if so, pick the best fit from: {_THEME_OPTIONS}.\n"
