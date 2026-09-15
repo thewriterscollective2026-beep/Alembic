@@ -355,7 +355,7 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
 
 @app.get("/dev/usage", response_class=HTMLResponse)
 def dev_usage(request: Request, db: Session = Depends(get_session)):
-    require_user(request, db)  # any logged-in user - single-deployment dev tool
+    user = require_user(request, db)  # any logged-in user - single-deployment dev tool
     rows = db.query(UsageLog).order_by(UsageLog.created_at.desc()).limit(300).all()
     totals = {
         "input": sum(r.input_tokens for r in rows),
@@ -364,7 +364,7 @@ def dev_usage(request: Request, db: Session = Depends(get_session)):
         "cache_write": sum(r.cache_write_tokens for r in rows),
     }
     return templates.TemplateResponse("usage_log.html", {
-        "request": request, "rows": rows, "totals": totals,
+        "request": request, "user": user, "rows": rows, "totals": totals,
     })
 
 
