@@ -33,6 +33,14 @@ class User(Base):
     # style, see email_template.py) - distinct from `theme` (color only), which
     # Claude still picks per issue.
     newsletter_layout: Mapped[str] = mapped_column(String(20), default="editorial")
+    # Author avatar for the "banner" layout's byline (base64-encoded image bytes +
+    # its mime type). Stored in the DB, not on disk - this app runs on hosts with
+    # no persistent disk (see "Database" below), so a local file would vanish on
+    # redeploy. Served publicly at GET /avatar/{user.id} (main.py) since a
+    # recipient's mail client fetches it directly, with no session. Empty means
+    # "no photo uploaded" - the banner layout falls back to a CSS initial circle.
+    avatar_image: Mapped[str] = mapped_column(Text, default="")
+    avatar_mime: Mapped[str] = mapped_column(String(64), default="")
     schedule_active: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

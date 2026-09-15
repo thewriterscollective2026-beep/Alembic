@@ -101,6 +101,26 @@
   <button class="btn" type="submit">Save settings</button>
 </form>
 
+<section class="group">
+  <h2>Profile photo</h2>
+  <p class="hint">Used as your byline avatar in the <strong>Banner</strong> layout only (Layout, above).
+  Without one, the byline shows a plain circle with your initial instead — this is entirely optional.</p>
+  {% if user.avatar_image %}
+    <p class="muted">
+      <img src="/avatar/{{ user.id }}" alt="Current photo" width="44" height="44"
+           style="width:44px;height:44px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:10px">
+      Current photo
+    </p>
+    <form method="post" action="/settings/avatar/remove" class="form" style="display:inline">
+      <button class="btn" type="submit">Remove photo</button>
+    </form>
+  {% endif %}
+  <form method="post" action="/settings/avatar" enctype="multipart/form-data" class="form">
+    <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
+    <button class="btn" type="submit">{{ "Replace photo" if user.avatar_image else "Upload photo" }}</button>
+  </form>
+</section>
+
 <p class="note">Every run researches your newsletters and emails you the finished draft first.
 Nothing sends to your list until you reply <strong>APPROVED</strong> to that email.</p>
 {% endblock %}

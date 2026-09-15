@@ -115,9 +115,16 @@ def _masthead(t: dict, kicker: str, issue_number: str, headline: str,
   </td></tr>"""
 
 
-def _initial_avatar(t: dict, name: str, size: int = 44) -> str:
-    """CSS-drawn circle with the author's first initial - stands in for a photo
-    avatar without needing an image asset (see module docstring)."""
+def _initial_avatar(t: dict, name: str, avatar_url: str = "", size: int = 44) -> str:
+    """The author's uploaded photo if `avatar_url` is set, otherwise a CSS-drawn
+    circle with their first initial - a real photo is an explicit opt-in
+    (Settings -> upload), not the default (see module docstring)."""
+    if avatar_url.strip():
+        return (
+            f'<td width="{size}" style="width:{size}px;height:{size}px">'
+            f'<img src="{_html.escape(avatar_url)}" width="{size}" height="{size}" alt="{_e(name)}" '
+            f'style="width:{size}px;height:{size}px;border-radius:50%;display:block;object-fit:cover"></td>'
+        )
     initial = (name or "?").strip()[:1].upper() or "?"
     return (
         f'<td width="{size}" style="width:{size}px;height:{size}px;border-radius:50%;'
@@ -129,7 +136,7 @@ def _initial_avatar(t: dict, name: str, size: int = 44) -> str:
 
 def _banner_masthead(t: dict, brand_name: str, label: str, emoji: str, issue_date: str,
                       headline: str, issue_tagline: str, author_name: str,
-                      read_online_url: str, sponsor: dict | None) -> str:
+                      read_online_url: str, sponsor: dict | None, avatar_url: str = "") -> str:
     read_online = ""
     if read_online_url.strip():
         read_online = (f' &nbsp;|&nbsp; <a class="nl-link" href="{_html.escape(read_online_url)}" '
@@ -166,7 +173,7 @@ def _banner_masthead(t: dict, brand_name: str, label: str, emoji: str, issue_dat
       {_row_spacer(20)}
       <tr><td align="center">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          {_initial_avatar(t, author_name)}
+          {_initial_avatar(t, author_name, avatar_url)}
           <td width="10" style="width:10px">&nbsp;</td>
           <td valign="middle" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;
             line-height:18px;color:{INK};font-weight:bold">{_e(author_name or brand_name)}</td>
@@ -394,12 +401,15 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
                  from_email: str = "", theme: str = DEFAULT_THEME, issue_number: str = "",
                  subject: str = "", issue_date: str = "", layout: str = "editorial",
                  author_name: str = "", read_online_url: str = "",
-                 sponsor: dict | None = None, social_links: dict | None = None) -> str:
+                 sponsor: dict | None = None, social_links: dict | None = None,
+                 avatar_url: str = "") -> str:
     """Return a full, styled HTML email built from structured `sections` data.
 
     `layout` picks the masthead/footer structure ("editorial" or "banner" - see
-    module docstring); `author_name`, `read_online_url`, `sponsor`, `social_links`
-    only affect the "banner" layout and are all optional/no-op on "editorial".
+    module docstring); `author_name`, `read_online_url`, `sponsor`, `social_links`,
+    `avatar_url` only affect the "banner" layout and are all optional/no-op on
+    "editorial". `avatar_url` must be a publicly reachable image URL (a recipient's
+    mail client fetches it directly) - omit it to fall back to the CSS initial circle.
     """
     import datetime as _dt
     t = _theme(theme)
@@ -430,7 +440,7 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
         masthead_html = _banner_masthead(
             t, brand_name, t["label"], t["emoji"], date_str, headline,
             sections.get("issue_tagline", ""), author_name or brand_name,
-            read_online_url, sponsor,
+            read_online_url, sponsor, avatar_url,
         )
         footer_html = _banner_footer(t, brand_name, address_line, unsub, social_links)
     else:

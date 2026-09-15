@@ -188,9 +188,16 @@ Alembic-the-tool, just this hand-rolled function). Brand new tables (like
   photos/illustrations by design — see its module docstring. Two independent axes:
   `theme` (`tech`/`business`/`general`, one of the color `THEMES`, picked per issue by
   Claude) and `layout` (`editorial` dark masthead, or `banner` — light masthead with
-  wordmark, author byline via a CSS initial-circle avatar, optional sponsor strip
-  scaffold, social-icon footer — a per-user structural choice, `User.newsletter_layout`,
-  set once in Settings, not decided by Claude).
+  wordmark, author byline via a CSS initial-circle avatar (or an uploaded photo, see
+  below), optional sponsor strip scaffold, social-icon footer — a per-user structural
+  choice, `User.newsletter_layout`, set once in Settings, not decided by Claude).
+  The banner byline photo (`User.avatar_image`/`avatar_mime`, base64 in the DB, not a
+  local file — this app has no persistent disk) is uploaded via `POST /settings/avatar`
+  and served publicly (no login) at `GET /avatar/{user_id}` in `main.py`, since a
+  recipient's mail client fetches it directly with no session — same public-route
+  pattern as `/unsubscribe/{token}`. No photo uploaded -> falls back to the initial
+  circle; this is the one deliberate exception to this module's no-photos rule, since
+  it's the user's own opt-in headshot, not decorative/stock imagery.
 
 ## Notes worth remembering
 

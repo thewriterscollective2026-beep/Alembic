@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 from .database import SessionLocal
 from .models import User, Sender, Draft, Contact, Campaign, CampaignRecipient
-from . import gmail_service, ai_service, provider, email_template, resend_service
+from . import config, gmail_service, ai_service, provider, email_template, resend_service
 
 # Frequency -> how many days back to scrape each run
 FREQUENCY_LOOKBACK_DAYS = {
@@ -108,6 +108,7 @@ def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft
         issue_number=f"Issue #{draft_id}" if draft_id else "",
         layout=user.newsletter_layout,
         author_name=user.brand_name or user.name,
+        avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
     )
 
 

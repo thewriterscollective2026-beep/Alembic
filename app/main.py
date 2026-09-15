@@ -3,12 +3,13 @@ email-driven review flow (runs email the user; approvals happen by reply)."""
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
-from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 
+import base64
 import json
 from . import (config, auth, gmail_service, ai_service, scheduler, excel_recipients, provider,
               imap_service, crypto, email_template, resend_webhooks, unsubscribe)
@@ -268,6 +269,56 @@ async def upload_recipients(request: Request, file: UploadFile = File(...), db: 
     return RedirectResponse("/settings", status_code=303)
 
 
+AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2MB - plenty for a small headshot, keeps DB rows small
+AVATAR_ALLOWED_MIMES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@app.post("/settings/avatar")
+async def upload_avatar(request: Request, file: UploadFile = File(...), db: Session = Depends(get_session)):
+    """Author photo for the 'banner' layout's byline (email_template._initial_avatar).
+    Stored as base64 in the DB, not on disk - this app runs on hosts with no
+    persistent disk. Served back publicly at GET /avatar/{user.id} below, since a
+    recipient's mail client fetches it directly with no session."""
+    user = require_user(request, db)
+    data = await file.read()
+    mime = file.content_type or ""
+    if mime not in AVATAR_ALLOWED_MIMES:
+        request.session["flash"] = "Photo must be a JPEG, PNG, or WebP image."
+        return RedirectResponse("/settings", status_code=303)
+    if len(data) > AVATAR_MAX_BYTES:
+        request.session["flash"] = "Photo is too large — please use one under 2MB."
+        return RedirectResponse("/settings", status_code=303)
+    user.avatar_image = base64.b64encode(data).decode("ascii")
+    user.avatar_mime = mime
+    db.commit()
+    request.session["flash"] = "Profile photo updated."
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/avatar/remove")
+def remove_avatar(request: Request, db: Session = Depends(get_session)):
+    user = require_user(request, db)
+    user.avatar_image = ""
+    user.avatar_mime = ""
+    db.commit()
+    request.session["flash"] = "Profile photo removed — back to the initial-circle avatar."
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.get("/avatar/{user_id}")
+def avatar_image(user_id: int, db: Session = Depends(get_session)):
+    """Public (no login) - referenced by <img> in sent newsletters, so a
+    recipient's mail client (not a browser session) fetches this directly."""
+    user = db.get(User, user_id)
+    if not user or not user.avatar_image:
+        raise HTTPException(404, "No avatar")
+    return Response(
+        content=base64.b64decode(user.avatar_image),
+        media_type=user.avatar_mime or "image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.post("/settings")
 def save_settings(
     request: Request,
@@ -345,6 +396,7 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
             from_email=user.email, theme=draft.theme, subject=draft.subject,
             issue_number=f"Issue #{draft.id}",
             layout=user.newsletter_layout, author_name=user.brand_name or user.name,
+            avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
         )
     return templates.TemplateResponse("review.html", {
         "request": request, "user": user, "draft": draft, "rendered_html": rendered_html,

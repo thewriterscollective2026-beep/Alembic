@@ -49,6 +49,10 @@ def _migrate():
                 conn.execute(text("ALTER TABLE users ADD COLUMN warmup_limit INTEGER DEFAULT 0"))
             if "newsletter_layout" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN newsletter_layout VARCHAR(20) DEFAULT 'editorial'"))
+            if "avatar_image" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN avatar_image TEXT DEFAULT ''"))
+            if "avatar_mime" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN avatar_mime VARCHAR(64) DEFAULT ''"))
         if "drafts" in tables:
             dcols = [c["name"] for c in insp.get_columns("drafts")]
             if "stage" not in dcols:  # old schema -> recreate (no live drafts yet)
