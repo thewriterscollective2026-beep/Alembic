@@ -73,6 +73,17 @@ All calls go through `_complete()`, which tags every call, logs its token usage 
 spend visibility the app has), and routes to a model: `config.CLAUDE_MODEL` (Sonnet 5) or
 `config.CLAUDE_MODEL_LIGHT` (Haiku 4.5, currently only `categorize_senders`).
 
+**Prompt caching:** `_complete(..., cache_system=True)` marks the system prompt as a 1-hour
+ephemeral cache breakpoint (`cache_control: {type: "ephemeral", ttl: "1h"}` on the system
+content block). Only `build_newsletter_from_summary` and `revise_newsletter` use it, since
+they're the two calls that share the exact same `_writer_system(brand_name, brand_signature)`
+text for a given user across a review thread — the 1h TTL is chosen because the gap between
+calls is however long the reviewer takes to reply, which a 5-minute default TTL usually
+wouldn't survive. `categorize_senders`/`build_summary` don't set it — no repeated system
+prompt to cache there. Verify it's actually hitting via `/dev/usage`'s cache-read column
+(should be near-zero on a cold call, then populate on the next call with the same system
+prompt within the TTL window).
+
 **Research happens at the summary stage, not at final-write time.** `build_summary` reads
 the raw source newsletters directly (not a pre-condensed version), identifies cross-source
 themes and where sources agree/disagree, spots gaps none of them cover, and uses Claude's

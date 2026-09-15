@@ -34,20 +34,37 @@ WEB_SEARCH_TOOL = {
 
 def _complete(prompt: str, max_tokens: int = 2000, system: str | None = None,
               tools: list | None = None, model: str | None = None,
-              effort: str | None = None, tag: str = "", description: str = "") -> str:
+              effort: str | None = None, tag: str = "", description: str = "",
+              cache_system: bool = False) -> str:
     """Call Claude and return the joined visible text. Every call is tagged, described,
     and its token usage recorded - both to the `ai_service.usage` logger (for tailing
     the console during dev) and to the `usage_logs` DB table (for the /dev/usage page,
-    which is the only real spend visibility this app has - there's no Admin API key)."""
+    which is the only real spend visibility this app has - there's no Admin API key).
+
+    cache_system=True marks the system prompt as a 1-hour prompt cache breakpoint -
+    for calls that reuse the exact same system prompt across a span of minutes/hours
+    (e.g. revise_newsletter across a back-and-forth review thread, where the gap
+    between calls is however long the reviewer takes to reply - the 1h TTL survives
+    that; the default 5-min TTL usually wouldn't). Cached reads cost ~10% of normal
+    input price; a cache miss still costs the same as an uncached call plus a small
+    write premium, so this is safe to enable even on a first, never-reused call."""
     kwargs = {}
     if tools:
         kwargs["tools"] = tools
     if effort:
         kwargs["output_config"] = {"effort": effort}
+    system_text = system or "You are a precise, helpful assistant."
+    if cache_system:
+        system_param = [{
+            "type": "text", "text": system_text,
+            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+        }]
+    else:
+        system_param = system_text
     msg = _get_client().messages.create(
         model=model or config.CLAUDE_MODEL,
         max_tokens=max_tokens,
-        system=system or "You are a precise, helpful assistant.",
+        system=system_param,
         messages=[{"role": "user", "content": prompt}],
         **kwargs,
     )
@@ -369,7 +386,7 @@ def build_newsletter_from_summary(summary: str, brand_name: str = "", brand_sign
     )
     return _parse_newsletter_response(_complete(
         prompt, max_tokens=8192, system=_writer_system(brand_name, brand_signature),
-        effort=config.CLAUDE_WRITER_EFFORT, tag="build_newsletter",
+        effort=config.CLAUDE_WRITER_EFFORT, tag="build_newsletter", cache_system=True,
         description="Write the first newsletter draft from the researched brief"))
 
 
@@ -390,4 +407,5 @@ def revise_newsletter(current_sections: dict, feedback: str, subject: str = "", 
     return _parse_newsletter_response(_complete(
         prompt, max_tokens=8192, system=_writer_system(brand_name, brand_signature),
         tools=[WEB_SEARCH_TOOL], effort=config.CLAUDE_WRITER_EFFORT, tag="revise_newsletter",
+        cache_system=True,
         description=f"Revise newsletter draft per reviewer feedback: {feedback[:80]!r}"))
