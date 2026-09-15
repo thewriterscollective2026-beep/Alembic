@@ -107,7 +107,7 @@ def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft
         subject=subject,
         issue_number=f"Issue #{draft_id}" if draft_id else "",
         layout=user.newsletter_layout,
-        author_name=user.brand_name or user.name,
+        author_name=user.author_name or user.brand_name or user.name,
         avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
     )
 

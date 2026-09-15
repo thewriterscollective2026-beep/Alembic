@@ -197,7 +197,14 @@ Alembic-the-tool, just this hand-rolled function). Brand new tables (like
   recipient's mail client fetches it directly with no session — same public-route
   pattern as `/unsubscribe/{token}`. No photo uploaded -> falls back to the initial
   circle; this is the one deliberate exception to this module's no-photos rule, since
-  it's the user's own opt-in headshot, not decorative/stock imagery.
+  it's the user's own opt-in headshot, not decorative/stock imagery. `brand_name`
+  (the masthead wordmark, e.g. "Alembic") and `author_name` (the banner byline next
+  to the avatar, e.g. "Rohan") are deliberately separate `User` fields - the
+  newsletter's title and the person writing it are not the same thing and must not
+  be conflated; `author_name` falls back to `brand_name` if unset. The banner
+  masthead's background uses the theme's `chip` color (a light tint), not a plain
+  white card - `editorial`'s masthead instead uses the theme's `dark` color, since
+  its light-colored text needs a dark background for contrast.
 
 ## Notes worth remembering
 

@@ -152,7 +152,7 @@ def _banner_masthead(t: dict, brand_name: str, label: str, emoji: str, issue_dat
       <tr><td align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:19px;
         line-height:24px;color:{INK};font-weight:bold">{_e(sponsor['name'])}</td></tr>"""
     return f"""
-  <tr><td class="nl-pad nl-fade" style="padding:24px 40px 30px 40px;background-color:{t['card_alt']};
+  <tr><td class="nl-pad nl-fade" style="padding:24px 40px 30px 40px;background-color:{t['chip']};
     border-bottom:1px solid {LINE}">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>

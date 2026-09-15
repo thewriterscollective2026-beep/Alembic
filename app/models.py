@@ -25,7 +25,13 @@ class User(Base):
     recipients_file: Mapped[str] = mapped_column(String(255), default="")  # original filename, for display
 
     # Branding / voice used when writing the newsletter
-    brand_name: Mapped[str] = mapped_column(String(255), default="")       # e.g. "Rohan / Irizpro Learning Solutions"
+    brand_name: Mapped[str] = mapped_column(String(255), default="")       # the newsletter's own name/title, e.g. "Alembic" - shown as the wordmark/masthead heading
+    # The byline name shown next to the author avatar in the "banner" layout
+    # (email_template._banner_masthead) - deliberately separate from brand_name:
+    # brand_name is the newsletter's title (masthead wordmark), author_name is
+    # the person writing it (e.g. "Rohan"), which can differ. Falls back to
+    # brand_name if unset, so existing users see no change until they set it.
+    author_name: Mapped[str] = mapped_column(String(255), default="")
     brand_signature: Mapped[str] = mapped_column(Text, default="")         # sign-off block, e.g. name, title, company, link
     subscribe_url: Mapped[str] = mapped_column(String(512), default="")    # link for the Subscribe button
     business_address: Mapped[str] = mapped_column(String(512), default="") # footer address (bulk-email compliance)

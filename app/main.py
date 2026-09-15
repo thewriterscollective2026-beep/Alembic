@@ -326,6 +326,7 @@ def save_settings(
     run_hour: int = Form(7),
     schedule_active: str = Form(""),
     brand_name: str = Form(""),
+    author_name: str = Form(""),
     brand_signature: str = Form(""),
     subscribe_url: str = Form(""),
     business_address: str = Form(""),
@@ -338,6 +339,7 @@ def save_settings(
     user.run_hour = max(0, min(23, int(run_hour)))
     user.schedule_active = bool(schedule_active) and bool(user.frequency)
     user.brand_name = brand_name.strip()
+    user.author_name = author_name.strip()
     user.brand_signature = brand_signature.strip()
     user.subscribe_url = subscribe_url.strip()
     user.business_address = business_address.strip()
@@ -395,7 +397,7 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
             subscribe_url=user.subscribe_url, address=user.business_address,
             from_email=user.email, theme=draft.theme, subject=draft.subject,
             issue_number=f"Issue #{draft.id}",
-            layout=user.newsletter_layout, author_name=user.brand_name or user.name,
+            layout=user.newsletter_layout, author_name=user.author_name or user.brand_name or user.name,
             avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
         )
     return templates.TemplateResponse("review.html", {

@@ -28,9 +28,14 @@
     <p class="hint">The newsletter is written in <strong>your</strong> voice as your own curated
     findings, and signed off with your branding.</p>
     <label class="field">
-      <span class="label">Your name / brand</span>
-      <span class="hint">Who it's "from" in voice, e.g. <em>Rohan / Irizpro Learning Solutions</em>.</span>
-      <input type="text" name="brand_name" value="{{ user.brand_name }}" placeholder="Rohan / Irizpro Learning Solutions">
+      <span class="label">Newsletter name</span>
+      <span class="hint">The newsletter's own title — shown as the masthead/wordmark heading at the top of every issue, e.g. <em>Alembic</em>.</span>
+      <input type="text" name="brand_name" value="{{ user.brand_name }}" placeholder="Alembic">
+    </label>
+    <label class="field">
+      <span class="label">Author / byline name</span>
+      <span class="hint">Whose voice it's written in and whose name appears next to the byline photo in the Banner layout — can be different from the newsletter name above, e.g. <em>Rohan</em>. Leave blank to reuse the newsletter name.</span>
+      <input type="text" name="author_name" value="{{ user.author_name }}" placeholder="Rohan">
     </label>
     <label class="field">
       <span class="label">Sign-off block</span>
