@@ -2,7 +2,7 @@
 email-driven review flow (runs email the user; approvals happen by reply)."""
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -360,14 +360,15 @@ def save_settings(
 # ---------------------------------------------------------------------------
 
 @app.post("/run-now")
-def run_now(request: Request, db: Session = Depends(get_session)):
+def run_now(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
     user = require_user(request, db)
-    result = start_run(user.id)
-    if result.get("draft_id"):
-        request.session["flash"] = (
-            "Summary emailed to your inbox — reply APPROVED there to continue.")
-    else:
-        request.session["flash"] = result.get("reason", "Run complete.")
+    # Research + writing takes minutes - far longer than a proxy tolerates for one
+    # HTTP request (Cloudflare 520 on Render). Run in the background; the outcome
+    # (draft or error) shows up under "Recent runs" and in the review email.
+    background_tasks.add_task(start_run, user.id)
+    request.session["flash"] = (
+        "Run started - research and writing take a few minutes. Refresh Recent runs, "
+        "then check your inbox for the draft and reply APPROVED there.")
     return RedirectResponse("/", status_code=303)
 
 
