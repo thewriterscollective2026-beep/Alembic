@@ -1,197 +1,228 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Settings</h1>
+<p class="lead">Changes save together — switch tabs freely, nothing is lost.</p>
 
-<section class="group">
-  <h2>Recipient list (Excel upload)</h2>
-  <p class="hint">Upload an <strong>.xlsx</strong> file of recipient emails. The tool pulls every
-  email address it finds — any column, with or without a header.</p>
-  <p class="muted">
-    {% if contact_counts.active or contact_counts.bounced or contact_counts.unsubscribed or contact_counts.complained %}
-      <strong>{{ contact_counts.active }}</strong> active recipient(s)
-      {% if user.recipients_file %}(last upload: <code>{{ user.recipients_file }}</code>){% endif %}.
-      {% if contact_counts.unsubscribed %}<br>{{ contact_counts.unsubscribed }} unsubscribed (suppressed).{% endif %}
-      {% if contact_counts.bounced %}<br>{{ contact_counts.bounced }} bounced (suppressed).{% endif %}
-      {% if contact_counts.complained %}<br>{{ contact_counts.complained }} marked as spam (suppressed).{% endif %}
-      <br>Re-uploading adds new emails — it never re-activates a suppressed contact.
-    {% else %}No recipients uploaded yet.{% endif %}
-  </p>
-  <form method="post" action="/settings/recipients" enctype="multipart/form-data" class="form">
-    <input type="file" name="file" accept=".xlsx" required>
-    <button class="btn" type="submit">Upload &amp; read emails</button>
-  </form>
-</section>
+<div class="tabs" role="tablist">
+  <button class="tab-btn active" type="button" data-tab="branding">Branding &amp; Layout</button>
+  <button class="tab-btn" type="button" data-tab="note">Custom Note</button>
+  <button class="tab-btn" type="button" data-tab="schedule">Schedule &amp; Sending</button>
+  <button class="tab-btn" type="button" data-tab="recipients">Recipients</button>
+</div>
 
 <form method="post" action="/settings" class="form">
-  <section class="group">
-    <h2>Your branding &amp; voice</h2>
-    <p class="hint">The newsletter is written in <strong>your</strong> voice as your own curated
-    findings, and signed off with your branding.</p>
-    <label class="field">
-      <span class="label">Newsletter name</span>
-      <span class="hint">The newsletter's own title — shown as the masthead/wordmark heading at the top of every issue, e.g. <em>Alembic</em>.</span>
-      <input type="text" name="brand_name" value="{{ user.brand_name }}" placeholder="Alembic">
-    </label>
-    <label class="field">
-      <span class="label">Author / byline name</span>
-      <span class="hint">Whose voice it's written in and whose name appears next to the byline photo in the Banner layout — can be different from the newsletter name above, e.g. <em>Rohan</em>. Leave blank to reuse the newsletter name.</span>
-      <input type="text" name="author_name" value="{{ user.author_name }}" placeholder="Rohan">
-    </label>
-    <label class="field">
-      <span class="label">Sign-off block</span>
-      <span class="hint">Appears at the end of every newsletter. Plain text or simple HTML.</span>
-      <textarea name="brand_signature" rows="4" placeholder="Rohan Laddad&#10;Marketing Manager, Irizpro Learning Solutions&#10;https://irizpro.com">{{ user.brand_signature }}</textarea>
-    </label>
-    <label class="field">
-      <span class="label">Subscribe link</span>
-      <span class="hint">Powers the "Subscribe" button + footer link in every issue.</span>
-      <input type="text" name="subscribe_url" value="{{ user.subscribe_url }}" placeholder="https://irizpro.com/newsletter">
-    </label>
-    <label class="field">
-      <span class="label">Business address</span>
-      <span class="hint">Shown in the footer — required by law for bulk email.</span>
-      <input type="text" name="business_address" value="{{ user.business_address }}" placeholder="Irizpro Learning Solutions, City, Country">
-    </label>
-    <label class="field">
-      <span class="label">Layout</span>
-      <span class="hint">Overall structure of the newsletter — colors are still picked automatically per issue.</span>
-      <select name="newsletter_layout">
-        <option value="editorial" {% if user.newsletter_layout != 'banner' %}selected{% endif %}>Editorial — dark masthead</option>
-        <option value="banner" {% if user.newsletter_layout == 'banner' %}selected{% endif %}>Banner — logo + author byline</option>
-      </select>
-    </label>
-  </section>
+  <div class="tab-panel" data-panel="branding">
+    <section class="group">
+      <h2>Your branding &amp; voice</h2>
+      <p class="hint">The newsletter is written in <strong>your</strong> voice as your own curated
+      findings, and signed off with your branding.</p>
+      <label class="field">
+        <span class="label">Newsletter name</span>
+        <span class="hint">The newsletter's own title — shown as the masthead/wordmark heading at the top of every issue, e.g. <em>Alembic</em>.</span>
+        <input type="text" name="brand_name" value="{{ user.brand_name }}" placeholder="Alembic">
+      </label>
+      <label class="field">
+        <span class="label">Author / byline name</span>
+        <span class="hint">Whose voice it's written in and whose name appears next to the byline photo in the Banner layout — can be different from the newsletter name above, e.g. <em>Rohan</em>. Leave blank to reuse the newsletter name.</span>
+        <input type="text" name="author_name" value="{{ user.author_name }}" placeholder="Rohan">
+      </label>
+      <label class="field">
+        <span class="label">Sign-off block</span>
+        <span class="hint">Appears at the end of every newsletter. Plain text or simple HTML.</span>
+        <textarea name="brand_signature" rows="4" placeholder="Rohan Laddad&#10;Marketing Manager, Irizpro Learning Solutions&#10;https://irizpro.com">{{ user.brand_signature }}</textarea>
+      </label>
+      <label class="field">
+        <span class="label">Subscribe link</span>
+        <span class="hint">Powers the "Subscribe" button + footer link in every issue.</span>
+        <input type="text" name="subscribe_url" value="{{ user.subscribe_url }}" placeholder="https://irizpro.com/newsletter">
+      </label>
+      <label class="field">
+        <span class="label">Business address</span>
+        <span class="hint">Shown in the footer — required by law for bulk email.</span>
+        <input type="text" name="business_address" value="{{ user.business_address }}" placeholder="Irizpro Learning Solutions, City, Country">
+      </label>
+      <label class="field">
+        <span class="label">Layout</span>
+        <span class="hint">Overall structure of the newsletter — colors are still picked automatically per issue.</span>
+        <select name="newsletter_layout">
+          <option value="editorial" {% if user.newsletter_layout != 'banner' %}selected{% endif %}>Editorial — dark masthead</option>
+          <option value="banner" {% if user.newsletter_layout == 'banner' %}selected{% endif %}>Banner — logo + author byline</option>
+        </select>
+      </label>
+    </section>
+  </div>
 
-  <section class="group">
-    <h2>Custom note</h2>
-    <p class="hint">An optional callout in your own words — not written by AI. While on, it's
-    woven into <strong>every</strong> issue at the position you pick below, until you turn it
-    off or change it.</p>
-    <label class="check">
-      <input type="checkbox" id="cn-enabled" name="custom_note_enabled" value="1" {% if user.custom_note_enabled %}checked{% endif %}>
-      Include this note in newsletters
-    </label>
-    <label class="field">
-      <span class="label">Title</span>
-      <span class="hint">Shown as a small label above the note. Leave blank to hide the label.</span>
-      <input type="text" id="cn-title" name="custom_note_title" value="{{ user.custom_note_title }}" placeholder="A Note" maxlength="100">
-    </label>
-    <label class="field">
-      <span class="label">Text</span>
-      <textarea id="cn-text" name="custom_note_text" rows="4" placeholder="Write the note or quote you want to appear in the newsletter...">{{ user.custom_note_text }}</textarea>
-    </label>
-    <label class="field">
-      <span class="label">Font</span>
-      <span class="hint">All free, websafe fonts already built into every device — no purchase, no download.</span>
-      <select id="cn-font" name="custom_note_font">
-        <option value="default" {% if user.custom_note_font == 'default' %}selected{% endif %}>Default (serif)</option>
-        <option value="serif" {% if user.custom_note_font == 'serif' %}selected{% endif %}>Serif (Georgia)</option>
-        <option value="sans" {% if user.custom_note_font == 'sans' %}selected{% endif %}>Sans-serif (Arial)</option>
-        <option value="mono" {% if user.custom_note_font == 'mono' %}selected{% endif %}>Monospace (Courier)</option>
-        <option value="elegant" {% if user.custom_note_font == 'elegant' %}selected{% endif %}>Elegant (Trebuchet)</option>
-        <option value="verdana" {% if user.custom_note_font == 'verdana' %}selected{% endif %}>Verdana</option>
-        <option value="tahoma" {% if user.custom_note_font == 'tahoma' %}selected{% endif %}>Tahoma</option>
-        <option value="times" {% if user.custom_note_font == 'times' %}selected{% endif %}>Times New Roman</option>
-        <option value="palatino" {% if user.custom_note_font == 'palatino' %}selected{% endif %}>Palatino</option>
-        <option value="garamond" {% if user.custom_note_font == 'garamond' %}selected{% endif %}>Garamond</option>
-      </select>
-    </label>
-    <label class="field">
-      <span class="label">Text size</span>
-      <input type="number" id="cn-size" name="custom_note_size" min="12" max="28" step="1" value="{{ user.custom_note_size }}">
-    </label>
-    <label class="field">
-      <span class="label">Text color</span>
-      <input type="color" id="cn-color" name="custom_note_color" value="{{ user.custom_note_color }}" style="height:40px;width:70px;padding:2px;cursor:pointer">
-    </label>
-    <label class="field">
-      <span class="label">Placement</span>
-      <select id="cn-position" name="custom_note_position">
-        <option value="top" {% if user.custom_note_position == 'top' %}selected{% endif %}>Top, before the opening note</option>
-        <option value="after_summary" {% if user.custom_note_position == 'after_summary' %}selected{% endif %}>After the "What's in this issue" summary</option>
-        <option value="before_signature" {% if user.custom_note_position == 'before_signature' %}selected{% endif %}>Just before the sign-off</option>
-        <option value="bottom" {% if user.custom_note_position == 'bottom' %}selected{% endif %}>Very bottom, after everything</option>
-      </select>
-    </label>
-    <div class="hint" style="margin:10px 0 6px">Live preview — approximate; the actual color
-    theme is picked automatically per issue:</div>
-    <div id="cn-preview" style="background:#f0dcc8;border-radius:14px;padding:20px 22px">
-      <div id="cn-preview-title" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
-        letter-spacing:.14em;text-transform:uppercase;color:#c67139;font-weight:bold;margin-bottom:10px"></div>
-      <div id="cn-preview-text" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;
-        line-height:26px;color:#201e1d;white-space:pre-wrap"></div>
-    </div>
-  </section>
+  <div class="tab-panel" data-panel="note" hidden>
+    <section class="group">
+      <h2>Custom note</h2>
+      <p class="hint">An optional callout in your own words — not written by AI. While on, it's
+      woven into <strong>every</strong> issue at the position you pick below, until you turn it
+      off or change it.</p>
+      <label class="check">
+        <input type="checkbox" id="cn-enabled" name="custom_note_enabled" value="1" {% if user.custom_note_enabled %}checked{% endif %}>
+        Include this note in newsletters
+      </label>
+      <label class="field">
+        <span class="label">Title</span>
+        <span class="hint">Shown as a small label above the note. Leave blank to hide the label.</span>
+        <input type="text" id="cn-title" name="custom_note_title" value="{{ user.custom_note_title }}" placeholder="A Note" maxlength="100">
+      </label>
+      <label class="field">
+        <span class="label">Text</span>
+        <textarea id="cn-text" name="custom_note_text" rows="4" placeholder="Write the note or quote you want to appear in the newsletter...">{{ user.custom_note_text }}</textarea>
+      </label>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px">
+        <label class="field">
+          <span class="label">Font</span>
+          <select id="cn-font" name="custom_note_font">
+            <option value="default" {% if user.custom_note_font == 'default' %}selected{% endif %}>Default (serif)</option>
+            <option value="serif" {% if user.custom_note_font == 'serif' %}selected{% endif %}>Serif (Georgia)</option>
+            <option value="sans" {% if user.custom_note_font == 'sans' %}selected{% endif %}>Sans-serif (Arial)</option>
+            <option value="mono" {% if user.custom_note_font == 'mono' %}selected{% endif %}>Monospace (Courier)</option>
+            <option value="elegant" {% if user.custom_note_font == 'elegant' %}selected{% endif %}>Elegant (Trebuchet)</option>
+            <option value="verdana" {% if user.custom_note_font == 'verdana' %}selected{% endif %}>Verdana</option>
+            <option value="tahoma" {% if user.custom_note_font == 'tahoma' %}selected{% endif %}>Tahoma</option>
+            <option value="times" {% if user.custom_note_font == 'times' %}selected{% endif %}>Times New Roman</option>
+            <option value="palatino" {% if user.custom_note_font == 'palatino' %}selected{% endif %}>Palatino</option>
+            <option value="garamond" {% if user.custom_note_font == 'garamond' %}selected{% endif %}>Garamond</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Size</span>
+          <input type="number" id="cn-size" name="custom_note_size" min="12" max="28" step="1" value="{{ user.custom_note_size }}">
+        </label>
+        <label class="field">
+          <span class="label">Color</span>
+          <input type="color" id="cn-color" name="custom_note_color" value="{{ user.custom_note_color }}" style="height:44px;padding:2px;cursor:pointer">
+        </label>
+      </div>
+      <p class="hint" style="margin:-4px 0 0">All free, websafe fonts already built into every device — no purchase, no download.</p>
+      <label class="field">
+        <span class="label">Placement</span>
+        <select id="cn-position" name="custom_note_position">
+          <option value="top" {% if user.custom_note_position == 'top' %}selected{% endif %}>Top, before the opening note</option>
+          <option value="after_summary" {% if user.custom_note_position == 'after_summary' %}selected{% endif %}>After the "What's in this issue" summary</option>
+          <option value="before_signature" {% if user.custom_note_position == 'before_signature' %}selected{% endif %}>Just before the sign-off</option>
+          <option value="bottom" {% if user.custom_note_position == 'bottom' %}selected{% endif %}>Very bottom, after everything</option>
+        </select>
+      </label>
+      <div class="hint" style="margin:10px 0 6px">Live preview — approximate; the actual color
+      theme is picked automatically per issue:</div>
+      <div id="cn-preview" style="background:#f0dcc8;border-radius:14px;padding:20px 22px">
+        <div id="cn-preview-title" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
+          letter-spacing:.14em;text-transform:uppercase;color:#c67139;font-weight:bold;margin-bottom:10px"></div>
+        <div id="cn-preview-text" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;
+          line-height:26px;color:#201e1d;white-space:pre-wrap"></div>
+      </div>
+    </section>
+  </div>
 
-  <section class="group">
-    <h2>Schedule</h2>
-    <label class="field">
-      <span class="label">Frequency</span>
-      <span class="hint">Sets how far back each run reads your newsletters.</span>
-      <select name="frequency">
-        <option value="">— not scheduled —</option>
-        {% for key, label in frequencies.items() %}
-          <option value="{{ key }}" {% if user.frequency == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
+  <div class="tab-panel" data-panel="schedule" hidden>
+    <section class="group">
+      <h2>Schedule</h2>
+      <label class="field">
+        <span class="label">Frequency</span>
+        <span class="hint">Sets how far back each run reads your newsletters.</span>
+        <select name="frequency">
+          <option value="">— not scheduled —</option>
+          {% for key, label in frequencies.items() %}
+            <option value="{{ key }}" {% if user.frequency == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
 
-    <label class="field">
-      <span class="label">Run time (UTC hour)</span>
-      <span class="hint">The hour a run starts and emails you the drafted newsletter. Morning is best so newsletters have arrived.</span>
-      <select name="run_hour">
-        {% for h in hours %}
-          <option value="{{ h }}" {% if user.run_hour == h %}selected{% endif %}>{{ "%02d:00"|format(h) }} UTC</option>
-        {% endfor %}
-      </select>
-    </label>
+      <label class="field">
+        <span class="label">Run time (UTC hour)</span>
+        <span class="hint">The hour a run starts and emails you the drafted newsletter. Morning is best so newsletters have arrived.</span>
+        <select name="run_hour">
+          {% for h in hours %}
+            <option value="{{ h }}" {% if user.run_hour == h %}selected{% endif %}>{{ "%02d:00"|format(h) }} UTC</option>
+          {% endfor %}
+        </select>
+      </label>
 
-    <label class="check">
-      <input type="checkbox" name="schedule_active" value="1" {% if user.schedule_active %}checked{% endif %}>
-      Run automatically on this schedule
-    </label>
-  </section>
+      <label class="check">
+        <input type="checkbox" name="schedule_active" value="1" {% if user.schedule_active %}checked{% endif %}>
+        Run automatically on this schedule
+      </label>
+    </section>
 
-  <section class="group">
-    <h2>Sending domain warm-up</h2>
-    <p class="hint">Leave at 0 for normal sending. Set this for the <strong>first</strong>
-    campaign on a fresh sending domain only — it caps that send to the first N active
-    contacts, so you can ramp up gradually instead of sending to everyone on day one. Set
-    back to 0 once the domain is warmed up.</p>
-    <label class="field">
-      <span class="label">Limit next send to</span>
-      <input type="number" name="warmup_limit" min="0" value="{{ user.warmup_limit }}" placeholder="0 = no limit">
-    </label>
-  </section>
+    <section class="group">
+      <h2>Sending domain warm-up</h2>
+      <p class="hint">Leave at 0 for normal sending. Set this for the <strong>first</strong>
+      campaign on a fresh sending domain only — it caps that send to the first N active
+      contacts, so you can ramp up gradually instead of sending to everyone on day one. Set
+      back to 0 once the domain is warmed up.</p>
+      <label class="field">
+        <span class="label">Limit next send to</span>
+        <input type="number" name="warmup_limit" min="0" value="{{ user.warmup_limit }}" placeholder="0 = no limit">
+      </label>
+    </section>
+  </div>
 
   <button class="btn" type="submit">Save settings</button>
 </form>
 
-<section class="group">
-  <h2>Profile photo</h2>
-  <p class="hint">Used as your byline avatar in the <strong>Banner</strong> layout only (Layout, above).
-  Without one, the byline shows a plain circle with your initial instead — this is entirely optional.</p>
-  {% if user.avatar_image %}
-    <p class="muted">
-      <img src="/avatar/{{ user.id }}" alt="Current photo" width="44" height="44"
-           style="width:44px;height:44px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:10px">
-      Current photo
-    </p>
-    <form method="post" action="/settings/avatar/remove" class="form" style="display:inline">
-      <button class="btn" type="submit">Remove photo</button>
+<div class="tab-panel" data-panel="branding" hidden>
+  <section class="group">
+    <h2>Profile photo</h2>
+    <p class="hint">Used as your byline avatar in the <strong>Banner</strong> layout only (Layout, above).
+    Without one, the byline shows a plain circle with your initial instead — this is entirely optional.</p>
+    {% if user.avatar_image %}
+      <p class="muted">
+        <img src="/avatar/{{ user.id }}" alt="Current photo" width="44" height="44"
+             style="width:44px;height:44px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:10px">
+        Current photo
+      </p>
+      <form method="post" action="/settings/avatar/remove" class="form" style="display:inline">
+        <button class="btn" type="submit">Remove photo</button>
+      </form>
+    {% endif %}
+    <form method="post" action="/settings/avatar" enctype="multipart/form-data" class="form" style="gap:10px">
+      <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
+      <button class="btn" type="submit">{{ "Replace photo" if user.avatar_image else "Upload photo" }}</button>
     </form>
-  {% endif %}
-  <form method="post" action="/settings/avatar" enctype="multipart/form-data" class="form">
-    <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
-    <button class="btn" type="submit">{{ "Replace photo" if user.avatar_image else "Upload photo" }}</button>
-  </form>
-</section>
+  </section>
+</div>
+
+<div class="tab-panel" data-panel="recipients" hidden>
+  <section class="group">
+    <h2>Recipient list (Excel upload)</h2>
+    <p class="hint">Upload an <strong>.xlsx</strong> file of recipient emails. The tool pulls every
+    email address it finds — any column, with or without a header.</p>
+    <p class="muted">
+      {% if contact_counts.active or contact_counts.bounced or contact_counts.unsubscribed or contact_counts.complained %}
+        <strong>{{ contact_counts.active }}</strong> active recipient(s)
+        {% if user.recipients_file %}(last upload: <code>{{ user.recipients_file }}</code>){% endif %}.
+        {% if contact_counts.unsubscribed %}<br>{{ contact_counts.unsubscribed }} unsubscribed (suppressed).{% endif %}
+        {% if contact_counts.bounced %}<br>{{ contact_counts.bounced }} bounced (suppressed).{% endif %}
+        {% if contact_counts.complained %}<br>{{ contact_counts.complained }} marked as spam (suppressed).{% endif %}
+        <br>Re-uploading adds new emails — it never re-activates a suppressed contact.
+      {% else %}No recipients uploaded yet.{% endif %}
+    </p>
+    <form method="post" action="/settings/recipients" enctype="multipart/form-data" class="form" style="gap:10px">
+      <input type="file" name="file" accept=".xlsx" required>
+      <button class="btn" type="submit">Upload &amp; read emails</button>
+    </form>
+  </section>
+</div>
 
 <p class="note">Every run researches your newsletters and emails you the finished draft first.
 Nothing sends to your list until you reply <strong>APPROVED</strong> to that email.</p>
 
 <script>
   (function () {
+    var tabBtns = document.querySelectorAll(".tab-btn");
+    function showTab(name) {
+      tabBtns.forEach(function (b) { b.classList.toggle("active", b.dataset.tab === name); });
+      document.querySelectorAll(".tab-panel").forEach(function (p) {
+        p.hidden = p.dataset.panel !== name;
+      });
+    }
+    tabBtns.forEach(function (b) {
+      b.addEventListener("click", function () { showTab(b.dataset.tab); });
+    });
+
     var fonts = {
       default: "Georgia,'Times New Roman',serif",
       serif: "Georgia,'Times New Roman',serif",

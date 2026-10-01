@@ -15,7 +15,7 @@ from . import (config, auth, gmail_service, ai_service, scheduler, excel_recipie
               imap_service, crypto, email_template, resend_webhooks, unsubscribe)
 from .database import init_db, get_session
 from .models import User, Sender, Draft, UsageLog, Contact, Campaign, CampaignRecipient
-from .pipeline import start_run, poll_run_replies, active_contact_emails
+from .pipeline import begin_run, resume_run, poll_run_replies, active_contact_emails
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 app = FastAPI(title="Alembic")
@@ -25,6 +25,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["freq_labels"] = scheduler.FREQUENCY_LABELS
 
 STAGE_LABELS = {
+    "running": "Researching & writing… (usually a few minutes)",
     "review": "Awaiting newsletter approval (check your inbox)",
     "sent": "Sent to your list",
     "cancelled": "Cancelled",
@@ -381,12 +382,21 @@ def save_settings(
 def run_now(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_session)):
     user = require_user(request, db)
     # Research + writing takes minutes - far longer than a proxy tolerates for one
-    # HTTP request (Cloudflare 520 on Render). Run in the background; the outcome
-    # (draft or error) shows up under "Recent runs" and in the review email.
-    background_tasks.add_task(start_run, user.id)
+    # HTTP request (Cloudflare 520 on Render), so the actual work (resume_run)
+    # happens in the background. But begin_run() - creating the visible
+    # "running" placeholder - happens HERE, synchronously, before the redirect:
+    # BackgroundTasks only start after this response is sent, so creating that
+    # row inside the background task instead would race the browser reloading
+    # the dashboard before the row exists (worse on a cold Neon connection),
+    # which is exactly the "nothing happens on screen" symptom this fixes.
+    draft_id = begin_run(user.id)
+    if draft_id is None:
+        request.session["flash"] = "Could not start a run — try logging in again."
+        return RedirectResponse("/", status_code=303)
+    background_tasks.add_task(resume_run, user.id, draft_id)
     request.session["flash"] = (
-        "Run started - research and writing take a few minutes. Refresh Recent runs, "
-        "then check your inbox for the draft and reply APPROVED there.")
+        "Run started — see it under Recent runs below (this page refreshes itself "
+        "while it's in progress). You'll get the draft by email once it's done.")
     return RedirectResponse("/", status_code=303)
 
 

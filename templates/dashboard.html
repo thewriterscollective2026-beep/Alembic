@@ -40,7 +40,7 @@
     <tr>
       <td>{{ d.created_at.strftime("%b %d, %H:%M") }}</td>
       <td>{{ d.source_count }}</td>
-      <td><span class="status s-{{ d.stage }}">{% if d.stage == "review" %}<span class="waiting-dot"></span>{% endif %}{{ stage_labels.get(d.stage, d.stage) }}</span></td>
+      <td><span class="status s-{{ d.stage }}">{% if d.stage in ("running", "review") %}<span class="waiting-dot"></span>{% endif %}{{ stage_labels.get(d.stage, d.stage) }}</span></td>
       <td>{{ d.revision_count }}</td>
       <td><a href="/review/{{ d.id }}">View</a></td>
     </tr>
@@ -49,5 +49,13 @@
 </table>
 {% else %}
 <p class="muted">No runs yet. Set your newsletters + recipients, then hit <strong>Run now</strong> to get your first drafted newsletter in your inbox.</p>
+{% endif %}
+
+{% if drafts and drafts[0].stage == "running" %}
+<script>
+  // A run is in progress - auto-refresh so its status (success/error/no new
+  // mail) shows up without the user having to remember to reload manually.
+  setTimeout(function () { location.reload(); }, 10000);
+</script>
 {% endif %}
 {% endblock %}

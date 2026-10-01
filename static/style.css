@@ -135,7 +135,7 @@ a.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:va
 /* ---------- Status pills ---------- */
 .status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
   padding:4px 11px;border-radius:20px}
-.s-pending_review,.s-summary_review,.s-email_review{background:var(--amber-050);color:var(--amber)}
+.s-running,.s-pending_review,.s-summary_review,.s-email_review{background:var(--amber-050);color:var(--amber)}
 .s-sent{background:var(--green-050);color:var(--green-600)}
 .s-rejected,.s-cancelled,.s-no_content{background:var(--surface-2);color:var(--muted)}
 .s-error{background:var(--danger-050);color:var(--danger)}
@@ -146,6 +146,15 @@ a.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:va
   box-shadow:0 0 0 0 rgba(180,83,9,.5);animation:pulse 1.6s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(180,83,9,.45)}70%{box-shadow:0 0 0 7px rgba(180,83,9,0)}100%{box-shadow:0 0 0 0 rgba(180,83,9,0)}}
 @media (prefers-reduced-motion:reduce){.waiting-dot{animation:none}}
+
+/* ---------- Tabs (Settings) ---------- */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
+.tab-btn{appearance:none;border:0;background:transparent;color:var(--muted);font-family:inherit;
+  font-size:14px;font-weight:600;padding:10px 16px;border-radius:10px 10px 0 0;cursor:pointer;
+  border-bottom:2px solid transparent;transition:color .12s,background .12s}
+.tab-btn:hover{color:var(--ink-soft);background:var(--surface-2)}
+.tab-btn.active{color:var(--green-600);border-bottom-color:var(--green)}
+.tab-panel[hidden]{display:none}
 
 /* ---------- Groups / senders ---------- */
 .group{margin:22px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
@@ -173,6 +182,13 @@ a.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:va
 
 /* ---------- Forms ---------- */
 .form{display:grid;gap:20px;max-width:640px;margin-top:16px}
+/* Grid items stretch to the column width by default - inputs/selects/textarea
+   already force their own width:100% below, so stretching is fine for them,
+   but a <button> has no such rule and would otherwise stretch to max-width
+   (640px), which is the "very long buttons" bug. Opt out explicitly instead
+   of disabling stretch on .form, which textarea/select rely on. */
+.form > .btn{justify-self:start}
+.auth-card .form > .btn{justify-self:stretch}  /* auth forms want the full-width button */
 .field{display:grid;gap:6px}
 .label{font-weight:600;font-size:14px}
 .hint{font-size:13px;color:var(--muted)}

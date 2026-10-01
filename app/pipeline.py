@@ -145,16 +145,57 @@ def _draft_email_html(user, sections: dict, recipient_count: int, theme: str = "
 # Stage 1: start a run  (scrape -> research -> write the newsletter -> email for review)
 # ---------------------------------------------------------------------------
 
-def start_run(user_id: int) -> dict:
+def begin_run(user_id: int) -> int | None:
+    """Synchronously create the "running" placeholder Draft and return its id
+    (None if the user doesn't exist). Callers that hand the rest of the work
+    to a background task (main.py's /run-now) MUST call this directly in the
+    request - not inside the background task - and pass the id to resume_run.
+    BackgroundTasks only start after the HTTP response is sent, so creating
+    the row inside the background task instead would race the browser's
+    redirect back to the dashboard (worse on a cold Neon connection); the row
+    existing before the response goes out is what makes a run visible the
+    instant it's triggered, rather than silently absent for however long it
+    takes the background task to get its first commit in."""
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
         if not user:
-            return {"ok": False, "reason": "user not found"}
+            return None
+        draft = Draft(user_id=user_id, stage="running")
+        db.add(draft)
+        db.commit()
+        db.refresh(draft)
+        return draft.id
+    finally:
+        db.close()
+
+
+def start_run(user_id: int) -> dict:
+    """Entry point for the scheduler (one cron job per user, no preceding HTTP
+    request to create the placeholder synchronously) - creates it here instead,
+    then runs exactly like resume_run."""
+    draft_id = begin_run(user_id)
+    if draft_id is None:
+        return {"ok": False, "reason": "user not found"}
+    return resume_run(user_id, draft_id)
+
+
+def resume_run(user_id: int, draft_id: int) -> dict:
+    """Do the slow work (fetch mail, research, write) for a Draft that
+    begin_run already created as stage "running", updating that same row at
+    every exit path rather than creating a new one."""
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        draft = db.get(Draft, draft_id)
+        if not user or not draft:
+            return {"ok": False, "reason": "user or draft not found", "draft_id": draft_id}
 
         selected = [s.email for s in db.query(Sender).filter_by(user_id=user_id, selected=True).all()]
         if not selected:
-            return {"ok": False, "reason": "no senders selected"}
+            draft.stage, draft.error = "error", "No newsletters selected - pick senders in Onboarding first."
+            db.commit()
+            return {"ok": False, "reason": "no senders selected", "draft_id": draft_id}
 
         handle = provider.get_handle(user)
         days = FREQUENCY_LOOKBACK_DAYS.get(user.frequency, 1)
@@ -166,30 +207,31 @@ def start_run(user_id: int) -> dict:
             emails = handle.fetch_new(selected, datetime.utcnow() - timedelta(days=30))[:MAX_SOURCE_EMAILS]
 
         if not emails:
-            db.add(Draft(user_id=user_id, stage="no_content"))
+            draft.stage = "no_content"
             user.last_run = datetime.utcnow()
             db.commit()
-            return {"ok": True, "reason": f"no new emails in the last {days} day(s)"}
+            return {"ok": True, "reason": f"no new emails in the last {days} day(s)", "draft_id": draft_id}
 
         # Research step: reads the sources directly, finds cross-source themes/gaps,
         # researches them. This is internal now - not emailed for approval on its own.
+        draft.source_count = len(emails)
+        db.commit()
         summary = ai_service.build_summary(emails)
         if not summary.strip():
-            db.add(Draft(user_id=user_id, stage="no_content", source_count=len(emails)))
+            draft.stage = "no_content"
             user.last_run = datetime.utcnow()
             db.commit()
-            return {"ok": True, "reason": "no readable content"}
+            return {"ok": True, "reason": "no readable content", "draft_id": draft_id}
 
         result = ai_service.build_newsletter_from_summary(
             summary, user.brand_name or user.name, user.brand_signature)
 
-        draft = Draft(
-            user_id=user_id, stage="review", source_summary=summary,
-            subject=result["subject"], content_json=json.dumps(result["sections"]),
-            theme=result["theme"], source_count=len(emails),
-        )
-        db.add(draft)
-        db.flush()  # assigns draft.id, needed for the issue number in the email itself
+        draft.stage = "review"
+        draft.source_summary = summary
+        draft.subject = result["subject"]
+        draft.content_json = json.dumps(result["sections"])
+        draft.theme = result["theme"]
+        db.commit()
 
         recips = active_contact_emails(db, user_id)
         subject = f"[Approve to send] {result['subject']}"
@@ -201,13 +243,16 @@ def start_run(user_id: int) -> dict:
         draft.thread_id, draft.awaiting_msg_id = thread_id, msg_id
         user.last_run = datetime.utcnow()
         db.commit()
-        db.refresh(draft)
-        return {"ok": True, "draft_id": draft.id, "stage": "review"}
+        return {"ok": True, "draft_id": draft_id, "stage": "review"}
 
     except Exception as e:  # noqa: BLE001
         db.rollback()
         try:
-            db.add(Draft(user_id=user_id, stage="error", error=str(e)))
+            d = db.get(Draft, draft_id)
+            if d:
+                d.stage, d.error = "error", str(e)
+            else:
+                db.add(Draft(user_id=user_id, stage="error", error=str(e)))
             db.commit()
         except Exception:
             db.rollback()
