@@ -336,6 +336,8 @@ def save_settings(
     custom_note_title: str = Form("A Note"),
     custom_note_text: str = Form(""),
     custom_note_font: str = Form("default"),
+    custom_note_size: int = Form(16),
+    custom_note_color: str = Form("#201e1d"),
     custom_note_position: str = Form("top"),
     db: Session = Depends(get_session),
 ):
@@ -355,6 +357,10 @@ def save_settings(
     user.custom_note_text = custom_note_text.strip()
     user.custom_note_font = (
         custom_note_font if custom_note_font in email_template.CUSTOM_NOTE_FONTS else "default")
+    user.custom_note_size = max(
+        email_template.CUSTOM_NOTE_SIZE_MIN, min(email_template.CUSTOM_NOTE_SIZE_MAX, int(custom_note_size)))
+    user.custom_note_color = email_template.safe_hex_color(
+        custom_note_color, email_template.DEFAULT_CUSTOM_NOTE_COLOR)
     user.custom_note_position = (
         custom_note_position if custom_note_position in email_template.CUSTOM_NOTE_POSITIONS else "top")
     db.commit()
@@ -417,7 +423,8 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
             avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
             custom_note=({
                 "title": user.custom_note_title, "text": user.custom_note_text,
-                "font": user.custom_note_font, "position": user.custom_note_position,
+                "font": user.custom_note_font, "size": user.custom_note_size,
+                "color": user.custom_note_color, "position": user.custom_note_position,
             } if user.custom_note_enabled else None),
         )
     return templates.TemplateResponse("review.html", {

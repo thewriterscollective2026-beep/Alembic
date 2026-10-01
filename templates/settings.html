@@ -82,13 +82,27 @@
     </label>
     <label class="field">
       <span class="label">Font</span>
+      <span class="hint">All free, websafe fonts already built into every device — no purchase, no download.</span>
       <select id="cn-font" name="custom_note_font">
         <option value="default" {% if user.custom_note_font == 'default' %}selected{% endif %}>Default (serif)</option>
         <option value="serif" {% if user.custom_note_font == 'serif' %}selected{% endif %}>Serif (Georgia)</option>
         <option value="sans" {% if user.custom_note_font == 'sans' %}selected{% endif %}>Sans-serif (Arial)</option>
         <option value="mono" {% if user.custom_note_font == 'mono' %}selected{% endif %}>Monospace (Courier)</option>
         <option value="elegant" {% if user.custom_note_font == 'elegant' %}selected{% endif %}>Elegant (Trebuchet)</option>
+        <option value="verdana" {% if user.custom_note_font == 'verdana' %}selected{% endif %}>Verdana</option>
+        <option value="tahoma" {% if user.custom_note_font == 'tahoma' %}selected{% endif %}>Tahoma</option>
+        <option value="times" {% if user.custom_note_font == 'times' %}selected{% endif %}>Times New Roman</option>
+        <option value="palatino" {% if user.custom_note_font == 'palatino' %}selected{% endif %}>Palatino</option>
+        <option value="garamond" {% if user.custom_note_font == 'garamond' %}selected{% endif %}>Garamond</option>
       </select>
+    </label>
+    <label class="field">
+      <span class="label">Text size</span>
+      <input type="number" id="cn-size" name="custom_note_size" min="12" max="28" step="1" value="{{ user.custom_note_size }}">
+    </label>
+    <label class="field">
+      <span class="label">Text color</span>
+      <input type="color" id="cn-color" name="custom_note_color" value="{{ user.custom_note_color }}" style="height:40px;width:70px;padding:2px;cursor:pointer">
     </label>
     <label class="field">
       <span class="label">Placement</span>
@@ -184,10 +198,17 @@ Nothing sends to your list until you reply <strong>APPROVED</strong> to that ema
       sans: "Arial,Helvetica,sans-serif",
       mono: "'Courier New',Courier,monospace",
       elegant: "'Trebuchet MS',Verdana,sans-serif",
+      verdana: "Verdana,Geneva,sans-serif",
+      tahoma: "Tahoma,Geneva,sans-serif",
+      times: "'Times New Roman',Times,serif",
+      palatino: "'Palatino Linotype','Book Antiqua',Palatino,serif",
+      garamond: "Garamond,'Times New Roman',serif",
     };
     var titleEl = document.getElementById("cn-title");
     var textEl = document.getElementById("cn-text");
     var fontEl = document.getElementById("cn-font");
+    var sizeEl = document.getElementById("cn-size");
+    var colorEl = document.getElementById("cn-color");
     var pvTitle = document.getElementById("cn-preview-title");
     var pvText = document.getElementById("cn-preview-text");
     function render() {
@@ -195,8 +216,12 @@ Nothing sends to your list until you reply <strong>APPROVED</strong> to that ema
       pvTitle.hidden = !titleEl.value.trim();
       pvText.textContent = textEl.value || "Your note will appear here as you type.";
       pvText.style.fontFamily = fonts[fontEl.value] || fonts.default;
+      var size = Math.max(12, Math.min(28, parseInt(sizeEl.value, 10) || 16));
+      pvText.style.fontSize = size + "px";
+      pvText.style.lineHeight = Math.round(size * 1.6) + "px";
+      pvText.style.color = colorEl.value || "#201e1d";
     }
-    [titleEl, textEl, fontEl].forEach(function (el) {
+    [titleEl, textEl, fontEl, sizeEl, colorEl].forEach(function (el) {
       el.addEventListener("input", render);
       el.addEventListener("change", render);
     });

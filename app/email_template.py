@@ -77,8 +77,21 @@ CUSTOM_NOTE_FONTS = {
     "sans": "Arial,Helvetica,sans-serif",
     "mono": "'Courier New',Courier,monospace",
     "elegant": "'Trebuchet MS',Verdana,sans-serif",
+    "verdana": "Verdana,Geneva,sans-serif",
+    "tahoma": "Tahoma,Geneva,sans-serif",
+    "times": "'Times New Roman',Times,serif",
+    "palatino": "'Palatino Linotype','Book Antiqua',Palatino,serif",
+    "garamond": "Garamond,'Times New Roman',serif",
 }
 DEFAULT_CUSTOM_NOTE_FONT = "default"
+
+# Also websafe/system-only - a size or color picker that produced a web-font
+# request or an image would hit the same client-stripping problem noted above.
+# Size is a plain pixel value (clamped in main.py); color is a plain hex string.
+CUSTOM_NOTE_SIZE_MIN = 12
+CUSTOM_NOTE_SIZE_MAX = 28
+DEFAULT_CUSTOM_NOTE_SIZE = 16
+DEFAULT_CUSTOM_NOTE_COLOR = "#201e1d"
 
 # Where the custom note can be inserted relative to the AI-written sections.
 # Keys are what Settings/`User.custom_note_position` store; values are the
@@ -409,13 +422,29 @@ def _further_reading_section(t: dict, links: list) -> str:
   </td></tr>"""
 
 
-def _custom_note_section(t: dict, title: str, text: str, font_key: str) -> str:
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def safe_hex_color(value: str, default: str) -> str:
+    """Guards against CSS/attribute injection - this value goes straight into
+    a style attribute, unescaped, since _e() would HTML-escape the # and quotes
+    wrong for that context. Only a strict #rrggbb hex string passes through."""
+    value = (value or "").strip()
+    return value if _HEX_COLOR_RE.match(value) else default
+
+
+def _custom_note_section(t: dict, title: str, text: str, font_key: str,
+                          size: int = DEFAULT_CUSTOM_NOTE_SIZE,
+                          color: str = DEFAULT_CUSTOM_NOTE_COLOR) -> str:
     """Owner-authored callout (not AI-written) - see User.custom_note_* and
     CUSTOM_NOTE_FONTS/CUSTOM_NOTE_POSITIONS above. Styled like a pulled-quote
     card so it reads as a deliberate aside, not a stray paragraph."""
     if not text.strip():
         return ""
     font = CUSTOM_NOTE_FONTS.get(font_key, CUSTOM_NOTE_FONTS[DEFAULT_CUSTOM_NOTE_FONT])
+    size = max(CUSTOM_NOTE_SIZE_MIN, min(CUSTOM_NOTE_SIZE_MAX, int(size or DEFAULT_CUSTOM_NOTE_SIZE)))
+    line_height = round(size * 1.6)
+    text_color = safe_hex_color(color, DEFAULT_CUSTOM_NOTE_COLOR)
     body_html = _e(text.strip()).replace("\n", "<br>")
     title_html = (
         f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;'
@@ -430,8 +459,8 @@ def _custom_note_section(t: dict, title: str, text: str, font_key: str) -> str:
       <tr><td style="padding:20px 22px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           {title_html}
-          <tr><td style="font-family:{font};font-size:16px;line-height:26px;
-            color:{INK}">{body_html}</td></tr>
+          <tr><td style="font-family:{font};font-size:{size}px;line-height:{line_height}px;
+            color:{text_color}">{body_html}</td></tr>
         </table>
       </td></tr>
     </table>
@@ -465,7 +494,7 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
     mail client fetches it directly) - omit it to fall back to the CSS initial circle.
 
     `custom_note` is an owner-authored callout (User.custom_note_*, Settings-
-    controlled, not AI-written) - {"title", "text", "font", "position"} - or
+    controlled, not AI-written) - {"title", "text", "font", "size", "color", "position"} - or
     None/omitted to render nothing. See CUSTOM_NOTE_FONTS/CUSTOM_NOTE_POSITIONS.
     """
     import datetime as _dt
@@ -496,6 +525,8 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
         note_html = _custom_note_section(
             t, custom_note.get("title", ""), custom_note.get("text", ""),
             custom_note.get("font", DEFAULT_CUSTOM_NOTE_FONT),
+            size=custom_note.get("size", DEFAULT_CUSTOM_NOTE_SIZE),
+            color=custom_note.get("color", DEFAULT_CUSTOM_NOTE_COLOR),
         )
         before_key = CUSTOM_NOTE_POSITIONS.get(
             custom_note.get("position", DEFAULT_CUSTOM_NOTE_POSITION), "note")

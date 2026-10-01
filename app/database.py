@@ -63,6 +63,10 @@ def _migrate():
                 conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_text TEXT DEFAULT ''"))
             if "custom_note_font" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_font VARCHAR(20) DEFAULT 'default'"))
+            if "custom_note_size" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_size INTEGER DEFAULT 16"))
+            if "custom_note_color" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_color VARCHAR(7) DEFAULT '#201e1d'"))
             if "custom_note_position" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_position VARCHAR(20) DEFAULT 'top'"))
         if "drafts" in tables:

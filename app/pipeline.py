@@ -102,7 +102,8 @@ def _custom_note(user) -> dict | None:
         return None
     return {
         "title": user.custom_note_title, "text": user.custom_note_text,
-        "font": user.custom_note_font, "position": user.custom_note_position,
+        "font": user.custom_note_font, "size": user.custom_note_size,
+        "color": user.custom_note_color, "position": user.custom_note_position,
     }
 
 

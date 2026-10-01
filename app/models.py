@@ -56,6 +56,8 @@ class User(Base):
     custom_note_title: Mapped[str] = mapped_column(String(100), default="A Note")
     custom_note_text: Mapped[str] = mapped_column(Text, default="")
     custom_note_font: Mapped[str] = mapped_column(String(20), default="default")
+    custom_note_size: Mapped[int] = mapped_column(Integer, default=16)
+    custom_note_color: Mapped[str] = mapped_column(String(7), default="#201e1d")
     custom_note_position: Mapped[str] = mapped_column(String(20), default="top")
     schedule_active: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
