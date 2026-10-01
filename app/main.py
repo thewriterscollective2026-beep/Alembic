@@ -23,6 +23,13 @@ app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET, max_age=
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["freq_labels"] = scheduler.FREQUENCY_LABELS
+# Cache-busts /static/style.css (base.html appends ?v=<this>) - Cloudflare/the
+# browser can otherwise keep serving a stale copy of the CSS after a deploy,
+# at the same URL, with no signal that anything changed.
+try:
+    templates.env.globals["asset_version"] = int((BASE_DIR / "static" / "style.css").stat().st_mtime)
+except OSError:
+    templates.env.globals["asset_version"] = 0
 
 STAGE_LABELS = {
     "running": "Researching & writing… (usually a few minutes)",

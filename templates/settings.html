@@ -106,13 +106,16 @@
           <option value="bottom" {% if user.custom_note_position == 'bottom' %}selected{% endif %}>Very bottom, after everything</option>
         </select>
       </label>
-      <div class="hint" style="margin:10px 0 6px">Live preview — approximate; the actual color
-      theme is picked automatically per issue:</div>
-      <div id="cn-preview" style="background:#f0dcc8;border-radius:14px;padding:20px 22px">
-        <div id="cn-preview-title" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
-          letter-spacing:.14em;text-transform:uppercase;color:#c67139;font-weight:bold;margin-bottom:10px"></div>
-        <div id="cn-preview-text" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;
-          line-height:26px;color:#201e1d;white-space:pre-wrap"></div>
+      <div class="email-frame">
+        <div class="email-frame-bar">✉️ Live preview — how it looks inside the email</div>
+        <div id="cn-preview" style="background:#f0dcc8;border-radius:12px;padding:20px 22px">
+          <div id="cn-preview-title" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
+            letter-spacing:.14em;text-transform:uppercase;color:#c67139;font-weight:bold;margin-bottom:10px"></div>
+          <div id="cn-preview-text" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;
+            line-height:26px;color:#201e1d;white-space:pre-wrap"></div>
+        </div>
+        <p class="hint" style="margin:10px 2px 0">Colors shown here are the newsletter's own
+        theme (picked automatically per issue) — not this app's dark UI.</p>
       </div>
     </section>
   </div>

@@ -148,12 +148,14 @@ a.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:va
 @media (prefers-reduced-motion:reduce){.waiting-dot{animation:none}}
 
 /* ---------- Tabs (Settings) ---------- */
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
-.tab-btn{appearance:none;border:0;background:transparent;color:var(--muted);font-family:inherit;
-  font-size:14px;font-weight:600;padding:10px 16px;border-radius:10px 10px 0 0;cursor:pointer;
-  border-bottom:2px solid transparent;transition:color .12s,background .12s}
-.tab-btn:hover{color:var(--ink-soft);background:var(--surface-2)}
-.tab-btn.active{color:var(--green-600);border-bottom-color:var(--green)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 22px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:14px;padding:5px}
+.tab-btn{appearance:none;-webkit-appearance:none;-moz-appearance:none;border:0;background:transparent;
+  color:var(--ink-soft);font-family:inherit;font-size:14px;font-weight:600;padding:9px 16px;
+  border-radius:10px;cursor:pointer;transition:color .12s,background .12s,box-shadow .12s}
+.tab-btn:hover{color:var(--ink);background:var(--surface)}
+.tab-btn.active{color:#fff;background:linear-gradient(100deg,var(--green),#01b856);
+  box-shadow:0 3px 10px rgba(0,161,75,.35)}
 .tab-panel[hidden]{display:none}
 
 /* ---------- Groups / senders ---------- */
@@ -200,6 +202,16 @@ input:focus,textarea:focus,select:focus{outline:0;border-color:var(--green);box-
 textarea{resize:vertical}
 .check{display:flex;gap:10px;align-items:center;font-size:14px}
 .note{color:var(--muted);font-size:13px;margin-top:16px}
+
+/* ---------- Email-styled preview frame ---------- */
+/* Wraps a snippet that intentionally uses the NEWSLETTER's own light email
+   colors (not this app's dark UI) - e.g. the custom-note live preview - so
+   it reads as "a little email sitting on the dashboard" rather than a
+   broken/unstyled light box dropped into a dark page. */
+.email-frame{background:var(--surface-2);border:1px solid var(--line);border-radius:16px;
+  padding:14px;margin:4px 0}
+.email-frame-bar{font-size:12px;font-weight:600;color:var(--muted);margin:2px 4px 10px}
+.email-frame #cn-preview{box-shadow:0 6px 20px rgba(0,0,0,.18)}
 
 /* ---------- Preview / callouts ---------- */
 .preview{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;
