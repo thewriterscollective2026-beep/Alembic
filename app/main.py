@@ -256,10 +256,10 @@ async def upload_recipients(request: Request, file: UploadFile = File(...), db: 
         emails = excel_recipients.extract_emails_from_xlsx(data)
     except Exception as e:  # noqa: BLE001
         request.session["flash"] = f"Could not read that file: {e}"
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?tab=recipients", status_code=303)
     if not emails:
         request.session["flash"] = "No email addresses found in that file."
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?tab=recipients", status_code=303)
 
     filename = file.filename or "recipients.xlsx"
     existing = {c.email: c for c in db.query(Contact).filter_by(user_id=user.id).all()}
@@ -274,7 +274,7 @@ async def upload_recipients(request: Request, file: UploadFile = File(...), db: 
     request.session["flash"] = (
         f"Loaded {len(emails)} recipient(s) from {filename} — {added} new, "
         f"{len(emails) - added} already on the list.")
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=recipients", status_code=303)
 
 
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2MB - plenty for a small headshot, keeps DB rows small
@@ -292,15 +292,15 @@ async def upload_avatar(request: Request, file: UploadFile = File(...), db: Sess
     mime = file.content_type or ""
     if mime not in AVATAR_ALLOWED_MIMES:
         request.session["flash"] = "Photo must be a JPEG, PNG, or WebP image."
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?tab=branding", status_code=303)
     if len(data) > AVATAR_MAX_BYTES:
         request.session["flash"] = "Photo is too large — please use one under 2MB."
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?tab=branding", status_code=303)
     user.avatar_image = base64.b64encode(data).decode("ascii")
     user.avatar_mime = mime
     db.commit()
     request.session["flash"] = "Profile photo updated."
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=branding", status_code=303)
 
 
 @app.post("/settings/avatar/remove")
@@ -310,7 +310,7 @@ def remove_avatar(request: Request, db: Session = Depends(get_session)):
     user.avatar_mime = ""
     db.commit()
     request.session["flash"] = "Profile photo removed — back to the initial-circle avatar."
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=branding", status_code=303)
 
 
 @app.get("/avatar/{user_id}")
@@ -327,19 +327,42 @@ def avatar_image(user_id: int, db: Session = Depends(get_session)):
     )
 
 
-@app.post("/settings")
-def save_settings(
+# Settings is split into independent per-section forms (branding/note/schedule,
+# plus the pre-existing recipients/avatar routes below) rather than one giant
+# form - each section is a genuinely separate <form> now, which is also what
+# lets the branding fields and the profile-photo upload sit side by side as
+# independent grid columns in settings.html (a <form> can never contain
+# another <form> - they couldn't share one form and still be laid out that
+# way). Each route touches only its own User columns; the others are
+# untouched, so saving one section can never blank out another the way a
+# single giant form with hardcoded Form(...) defaults could.
+
+@app.post("/settings/branding")
+def save_branding(
     request: Request,
-    frequency: str = Form(""),
-    run_hour: int = Form(7),
-    schedule_active: str = Form(""),
     brand_name: str = Form(""),
     author_name: str = Form(""),
     brand_signature: str = Form(""),
     subscribe_url: str = Form(""),
     business_address: str = Form(""),
     newsletter_layout: str = Form("editorial"),
-    warmup_limit: int = Form(0),
+    db: Session = Depends(get_session),
+):
+    user = require_user(request, db)
+    user.brand_name = brand_name.strip()
+    user.author_name = author_name.strip()
+    user.brand_signature = brand_signature.strip()
+    user.subscribe_url = subscribe_url.strip()
+    user.business_address = business_address.strip()
+    user.newsletter_layout = newsletter_layout if newsletter_layout in ("editorial", "banner") else "editorial"
+    db.commit()
+    request.session["flash"] = "Branding & layout saved."
+    return RedirectResponse("/settings?tab=branding", status_code=303)
+
+
+@app.post("/settings/note")
+def save_note(
+    request: Request,
     custom_note_enabled: str = Form(""),
     custom_note_title: str = Form("A Note"),
     custom_note_text: str = Form(""),
@@ -350,16 +373,6 @@ def save_settings(
     db: Session = Depends(get_session),
 ):
     user = require_user(request, db)
-    user.frequency = frequency if frequency in scheduler.FREQUENCY_CRON else ""
-    user.run_hour = max(0, min(23, int(run_hour)))
-    user.schedule_active = bool(schedule_active) and bool(user.frequency)
-    user.brand_name = brand_name.strip()
-    user.author_name = author_name.strip()
-    user.brand_signature = brand_signature.strip()
-    user.subscribe_url = subscribe_url.strip()
-    user.business_address = business_address.strip()
-    user.newsletter_layout = newsletter_layout if newsletter_layout in ("editorial", "banner") else "editorial"
-    user.warmup_limit = max(0, int(warmup_limit))
     user.custom_note_enabled = bool(custom_note_enabled)
     user.custom_note_title = custom_note_title.strip() or "A Note"
     user.custom_note_text = custom_note_text.strip()
@@ -372,13 +385,32 @@ def save_settings(
     user.custom_note_position = (
         custom_note_position if custom_note_position in email_template.CUSTOM_NOTE_POSITIONS else "top")
     db.commit()
+    request.session["flash"] = "Custom note saved."
+    return RedirectResponse("/settings?tab=note", status_code=303)
+
+
+@app.post("/settings/schedule")
+def save_schedule(
+    request: Request,
+    frequency: str = Form(""),
+    run_hour: int = Form(7),
+    schedule_active: str = Form(""),
+    warmup_limit: int = Form(0),
+    db: Session = Depends(get_session),
+):
+    user = require_user(request, db)
+    user.frequency = frequency if frequency in scheduler.FREQUENCY_CRON else ""
+    user.run_hour = max(0, min(23, int(run_hour)))
+    user.schedule_active = bool(schedule_active) and bool(user.frequency)
+    user.warmup_limit = max(0, int(warmup_limit))
+    db.commit()
 
     if user.schedule_active:
         scheduler.schedule_user(user.id, user.frequency, user.run_hour)
     else:
         scheduler.unschedule_user(user.id)
-    request.session["flash"] = "Settings saved."
-    return RedirectResponse("/", status_code=303)
+    request.session["flash"] = "Schedule & sending saved."
+    return RedirectResponse("/settings?tab=schedule", status_code=303)
 
 
 # ---------------------------------------------------------------------------

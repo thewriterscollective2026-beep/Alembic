@@ -157,6 +157,15 @@ a.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:va
 .tab-btn.active{color:#fff;background:linear-gradient(100deg,var(--green),#01b856);
   box-shadow:0 3px 10px rgba(0,161,75,.35)}
 .tab-panel[hidden]{display:none}
+/* Side-by-side layout within a tab - a wider primary column (fields) plus a
+   narrower secondary one (e.g. the photo card, or a live preview), so a tab
+   spreads across the page width instead of stacking into one long column. */
+.cols-2{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
+.cols-2-even{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.field-row-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}
+.color-swatch{height:44px;padding:2px;cursor:pointer;width:100%}
+.photo-current{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.photo-current img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--line)}
 
 /* ---------- Groups / senders ---------- */
 .group{margin:22px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
@@ -227,6 +236,7 @@ textarea{resize:vertical}
 /* ---------- Responsive ---------- */
 @media(max-width:820px){
   .app{grid-template-columns:1fr}
+  .cols-2,.cols-2-even,.field-row-3{grid-template-columns:1fr}
   .sidebar{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;padding:12px 14px;gap:8px}
   .side-tag{display:none}
   .side-logo img{height:28px}
