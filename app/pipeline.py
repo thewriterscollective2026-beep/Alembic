@@ -94,6 +94,18 @@ _INSTRUCTIONS = (
 )
 
 
+def _custom_note(user) -> dict | None:
+    """Owner-authored callout from Settings (User.custom_note_*) - standing,
+    not per-run; included in every send while enabled. None/empty text -> the
+    template renders nothing (see email_template._custom_note_section)."""
+    if not user.custom_note_enabled:
+        return None
+    return {
+        "title": user.custom_note_title, "text": user.custom_note_text,
+        "font": user.custom_note_font, "position": user.custom_note_position,
+    }
+
+
 def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft_id: int | None = None) -> str:
     """Render the structured newsletter content into the branded, email-safe HTML shell."""
     return email_template.render_email(
@@ -109,6 +121,7 @@ def _wrap(user, sections: dict, theme: str = "general", subject: str = "", draft
         layout=user.newsletter_layout,
         author_name=user.author_name or user.brand_name or user.name,
         avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
+        custom_note=_custom_note(user),
     )
 
 

@@ -63,6 +63,53 @@
   </section>
 
   <section class="group">
+    <h2>Custom note</h2>
+    <p class="hint">An optional callout in your own words — not written by AI. While on, it's
+    woven into <strong>every</strong> issue at the position you pick below, until you turn it
+    off or change it.</p>
+    <label class="check">
+      <input type="checkbox" id="cn-enabled" name="custom_note_enabled" value="1" {% if user.custom_note_enabled %}checked{% endif %}>
+      Include this note in newsletters
+    </label>
+    <label class="field">
+      <span class="label">Title</span>
+      <span class="hint">Shown as a small label above the note. Leave blank to hide the label.</span>
+      <input type="text" id="cn-title" name="custom_note_title" value="{{ user.custom_note_title }}" placeholder="A Note" maxlength="100">
+    </label>
+    <label class="field">
+      <span class="label">Text</span>
+      <textarea id="cn-text" name="custom_note_text" rows="4" placeholder="Write the note or quote you want to appear in the newsletter...">{{ user.custom_note_text }}</textarea>
+    </label>
+    <label class="field">
+      <span class="label">Font</span>
+      <select id="cn-font" name="custom_note_font">
+        <option value="default" {% if user.custom_note_font == 'default' %}selected{% endif %}>Default (serif)</option>
+        <option value="serif" {% if user.custom_note_font == 'serif' %}selected{% endif %}>Serif (Georgia)</option>
+        <option value="sans" {% if user.custom_note_font == 'sans' %}selected{% endif %}>Sans-serif (Arial)</option>
+        <option value="mono" {% if user.custom_note_font == 'mono' %}selected{% endif %}>Monospace (Courier)</option>
+        <option value="elegant" {% if user.custom_note_font == 'elegant' %}selected{% endif %}>Elegant (Trebuchet)</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="label">Placement</span>
+      <select id="cn-position" name="custom_note_position">
+        <option value="top" {% if user.custom_note_position == 'top' %}selected{% endif %}>Top, before the opening note</option>
+        <option value="after_summary" {% if user.custom_note_position == 'after_summary' %}selected{% endif %}>After the "What's in this issue" summary</option>
+        <option value="before_signature" {% if user.custom_note_position == 'before_signature' %}selected{% endif %}>Just before the sign-off</option>
+        <option value="bottom" {% if user.custom_note_position == 'bottom' %}selected{% endif %}>Very bottom, after everything</option>
+      </select>
+    </label>
+    <div class="hint" style="margin:10px 0 6px">Live preview — approximate; the actual color
+    theme is picked automatically per issue:</div>
+    <div id="cn-preview" style="background:#f0dcc8;border-radius:14px;padding:20px 22px">
+      <div id="cn-preview-title" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;
+        letter-spacing:.14em;text-transform:uppercase;color:#c67139;font-weight:bold;margin-bottom:10px"></div>
+      <div id="cn-preview-text" style="font-family:Georgia,'Times New Roman',serif;font-size:16px;
+        line-height:26px;color:#201e1d;white-space:pre-wrap"></div>
+    </div>
+  </section>
+
+  <section class="group">
     <h2>Schedule</h2>
     <label class="field">
       <span class="label">Frequency</span>
@@ -128,4 +175,32 @@
 
 <p class="note">Every run researches your newsletters and emails you the finished draft first.
 Nothing sends to your list until you reply <strong>APPROVED</strong> to that email.</p>
+
+<script>
+  (function () {
+    var fonts = {
+      default: "Georgia,'Times New Roman',serif",
+      serif: "Georgia,'Times New Roman',serif",
+      sans: "Arial,Helvetica,sans-serif",
+      mono: "'Courier New',Courier,monospace",
+      elegant: "'Trebuchet MS',Verdana,sans-serif",
+    };
+    var titleEl = document.getElementById("cn-title");
+    var textEl = document.getElementById("cn-text");
+    var fontEl = document.getElementById("cn-font");
+    var pvTitle = document.getElementById("cn-preview-title");
+    var pvText = document.getElementById("cn-preview-text");
+    function render() {
+      pvTitle.textContent = titleEl.value || "";
+      pvTitle.hidden = !titleEl.value.trim();
+      pvText.textContent = textEl.value || "Your note will appear here as you type.";
+      pvText.style.fontFamily = fonts[fontEl.value] || fonts.default;
+    }
+    [titleEl, textEl, fontEl].forEach(function (el) {
+      el.addEventListener("input", render);
+      el.addEventListener("change", render);
+    });
+    render();
+  })();
+</script>
 {% endblock %}

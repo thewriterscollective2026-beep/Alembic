@@ -55,6 +55,16 @@ def _migrate():
                 conn.execute(text("ALTER TABLE users ADD COLUMN avatar_mime VARCHAR(64) DEFAULT ''"))
             if "author_name" not in ucols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN author_name VARCHAR(255) DEFAULT ''"))
+            if "custom_note_enabled" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_enabled BOOLEAN DEFAULT FALSE"))
+            if "custom_note_title" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_title VARCHAR(100) DEFAULT 'A Note'"))
+            if "custom_note_text" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_text TEXT DEFAULT ''"))
+            if "custom_note_font" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_font VARCHAR(20) DEFAULT 'default'"))
+            if "custom_note_position" not in ucols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN custom_note_position VARCHAR(20) DEFAULT 'top'"))
         if "drafts" in tables:
             dcols = [c["name"] for c in insp.get_columns("drafts")]
             if "stage" not in dcols:  # old schema -> recreate (no live drafts yet)

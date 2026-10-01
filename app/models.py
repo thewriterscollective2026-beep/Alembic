@@ -47,6 +47,16 @@ class User(Base):
     # "no photo uploaded" - the banner layout falls back to a CSS initial circle.
     avatar_image: Mapped[str] = mapped_column(Text, default="")
     avatar_mime: Mapped[str] = mapped_column(String(64), default="")
+    # Custom note/callout - an owner-authored block (not AI-written) woven into
+    # every newsletter while enabled, e.g. a personal aside or a one-off notice.
+    # Lives in Settings as a standing toggle, not a per-run choice - see
+    # email_template.py's CUSTOM_NOTE_FONTS/CUSTOM_NOTE_POSITIONS for the fixed
+    # font/position option sets (kept small and websafe for email-client support).
+    custom_note_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    custom_note_title: Mapped[str] = mapped_column(String(100), default="A Note")
+    custom_note_text: Mapped[str] = mapped_column(Text, default="")
+    custom_note_font: Mapped[str] = mapped_column(String(20), default="default")
+    custom_note_position: Mapped[str] = mapped_column(String(20), default="top")
     schedule_active: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

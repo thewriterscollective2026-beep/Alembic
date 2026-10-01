@@ -67,6 +67,30 @@ THEMES = {
 }
 DEFAULT_THEME = "general"
 
+# Websafe stacks only - a custom note is one of the few hand-authored (not
+# AI-written) blocks in the email, so its font choice must render consistently
+# across Gmail/Outlook/Apple Mail without a web-font request, which most mail
+# clients strip anyway. Keys are what Settings/`User.custom_note_font` store.
+CUSTOM_NOTE_FONTS = {
+    "default": "Georgia,'Times New Roman',serif",
+    "serif": "Georgia,'Times New Roman',serif",
+    "sans": "Arial,Helvetica,sans-serif",
+    "mono": "'Courier New',Courier,monospace",
+    "elegant": "'Trebuchet MS',Verdana,sans-serif",
+}
+DEFAULT_CUSTOM_NOTE_FONT = "default"
+
+# Where the custom note can be inserted relative to the AI-written sections.
+# Keys are what Settings/`User.custom_note_position` store; values are the
+# section keys in render_email's body-section list it's inserted before.
+CUSTOM_NOTE_POSITIONS = {
+    "top": "note",
+    "after_summary": "feature",
+    "before_signature": "signature",
+    "bottom": None,  # appended after every other section, before the footer
+}
+DEFAULT_CUSTOM_NOTE_POSITION = "top"
+
 
 def _theme(name: str) -> dict:
     return THEMES.get((name or "").lower(), THEMES[DEFAULT_THEME])
@@ -385,6 +409,35 @@ def _further_reading_section(t: dict, links: list) -> str:
   </td></tr>"""
 
 
+def _custom_note_section(t: dict, title: str, text: str, font_key: str) -> str:
+    """Owner-authored callout (not AI-written) - see User.custom_note_* and
+    CUSTOM_NOTE_FONTS/CUSTOM_NOTE_POSITIONS above. Styled like a pulled-quote
+    card so it reads as a deliberate aside, not a stray paragraph."""
+    if not text.strip():
+        return ""
+    font = CUSTOM_NOTE_FONTS.get(font_key, CUSTOM_NOTE_FONTS[DEFAULT_CUSTOM_NOTE_FONT])
+    body_html = _e(text.strip()).replace("\n", "<br>")
+    title_html = (
+        f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;'
+        f'line-height:14px;letter-spacing:.14em;text-transform:uppercase;color:{t["accent"]};'
+        f'font-weight:bold;padding-bottom:10px">{_e(title)}</td></tr>'
+        if title.strip() else ""
+    )
+    return f"""
+  <tr><td class="nl-pad" style="padding:24px 40px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+      style="background-color:{t['chip']};border-radius:14px">
+      <tr><td style="padding:20px 22px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          {title_html}
+          <tr><td style="font-family:{font};font-size:16px;line-height:26px;
+            color:{INK}">{body_html}</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>"""
+
+
 def _signature_section(t: dict, brand_signature: str) -> str:
     if not brand_signature.strip():
         return ""
@@ -402,7 +455,7 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
                  subject: str = "", issue_date: str = "", layout: str = "editorial",
                  author_name: str = "", read_online_url: str = "",
                  sponsor: dict | None = None, social_links: dict | None = None,
-                 avatar_url: str = "") -> str:
+                 avatar_url: str = "", custom_note: dict | None = None) -> str:
     """Return a full, styled HTML email built from structured `sections` data.
 
     `layout` picks the masthead/footer structure ("editorial" or "banner" - see
@@ -410,6 +463,10 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
     `avatar_url` only affect the "banner" layout and are all optional/no-op on
     "editorial". `avatar_url` must be a publicly reachable image URL (a recipient's
     mail client fetches it directly) - omit it to fall back to the CSS initial circle.
+
+    `custom_note` is an owner-authored callout (User.custom_note_*, Settings-
+    controlled, not AI-written) - {"title", "text", "font", "position"} - or
+    None/omitted to render nothing. See CUSTOM_NOTE_FONTS/CUSTOM_NOTE_POSITIONS.
     """
     import datetime as _dt
     t = _theme(theme)
@@ -426,15 +483,25 @@ def render_email(sections: dict, *, brand_name: str = "", brand_signature: str =
     preheader_pad = "&nbsp;&zwnj;" * 40
     is_banner = (layout or "").lower() == "banner"
 
-    body_sections = "".join([
-        _note_section(t, sections.get("note", "")),
-        _summary_section(t, sections.get("summary_points") or []),
-        _feature_section(t, sections.get("feature") or {}),
-        _stories_section(t, sections.get("stories") or []),
-        _quote_section(t, sections.get("quote") or {}),
-        _further_reading_section(t, sections.get("further_reading") or []),
-        _signature_section(t, brand_signature),
-    ])
+    body_parts = [
+        ("note", _note_section(t, sections.get("note", ""))),
+        ("summary", _summary_section(t, sections.get("summary_points") or [])),
+        ("feature", _feature_section(t, sections.get("feature") or {})),
+        ("stories", _stories_section(t, sections.get("stories") or [])),
+        ("quote", _quote_section(t, sections.get("quote") or {})),
+        ("further_reading", _further_reading_section(t, sections.get("further_reading") or [])),
+        ("signature", _signature_section(t, brand_signature)),
+    ]
+    if custom_note and (custom_note.get("text") or "").strip():
+        note_html = _custom_note_section(
+            t, custom_note.get("title", ""), custom_note.get("text", ""),
+            custom_note.get("font", DEFAULT_CUSTOM_NOTE_FONT),
+        )
+        before_key = CUSTOM_NOTE_POSITIONS.get(
+            custom_note.get("position", DEFAULT_CUSTOM_NOTE_POSITION), "note")
+        idx = next((i for i, (k, _) in enumerate(body_parts) if k == before_key), len(body_parts))
+        body_parts.insert(idx, ("custom_note", note_html))
+    body_sections = "".join(html for _, html in body_parts)
 
     if is_banner:
         masthead_html = _banner_masthead(

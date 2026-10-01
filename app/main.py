@@ -332,6 +332,11 @@ def save_settings(
     business_address: str = Form(""),
     newsletter_layout: str = Form("editorial"),
     warmup_limit: int = Form(0),
+    custom_note_enabled: str = Form(""),
+    custom_note_title: str = Form("A Note"),
+    custom_note_text: str = Form(""),
+    custom_note_font: str = Form("default"),
+    custom_note_position: str = Form("top"),
     db: Session = Depends(get_session),
 ):
     user = require_user(request, db)
@@ -345,6 +350,13 @@ def save_settings(
     user.business_address = business_address.strip()
     user.newsletter_layout = newsletter_layout if newsletter_layout in ("editorial", "banner") else "editorial"
     user.warmup_limit = max(0, int(warmup_limit))
+    user.custom_note_enabled = bool(custom_note_enabled)
+    user.custom_note_title = custom_note_title.strip() or "A Note"
+    user.custom_note_text = custom_note_text.strip()
+    user.custom_note_font = (
+        custom_note_font if custom_note_font in email_template.CUSTOM_NOTE_FONTS else "default")
+    user.custom_note_position = (
+        custom_note_position if custom_note_position in email_template.CUSTOM_NOTE_POSITIONS else "top")
     db.commit()
 
     if user.schedule_active:
@@ -403,6 +415,10 @@ def review(draft_id: int, request: Request, db: Session = Depends(get_session)):
             issue_number=f"Issue #{draft.id}",
             layout=user.newsletter_layout, author_name=user.author_name or user.brand_name or user.name,
             avatar_url=f"{config.APP_BASE_URL}/avatar/{user.id}" if user.avatar_image else "",
+            custom_note=({
+                "title": user.custom_note_title, "text": user.custom_note_text,
+                "font": user.custom_note_font, "position": user.custom_note_position,
+            } if user.custom_note_enabled else None),
         )
     return templates.TemplateResponse("review.html", {
         "request": request, "user": user, "draft": draft, "rendered_html": rendered_html,
