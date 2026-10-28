@@ -1,5 +1,6 @@
 """FastAPI application: login, onboarding, settings (Excel upload), and an
 email-driven review flow (runs email the user; approvals happen by reply)."""
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File, BackgroundTasks
@@ -69,10 +70,8 @@ def home(request: Request, db: Session = Depends(get_session)):
     user = current_user(request, db)
     missing = config.missing_required()
     if not user:
-        google_ok = bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
-        core_missing = [m for m in missing if m in ("ANTHROPIC_API_KEY", "FERNET_KEY")]
-        return templates.TemplateResponse("login.html", {
-            "request": request, "missing": core_missing, "google_ok": google_ok})
+        return templates.TemplateResponse("landing.html", {
+            "request": request, "year": datetime.utcnow().year})
     if not user.onboarded:
         return RedirectResponse("/onboarding", status_code=303)
     drafts = db.query(Draft).filter_by(user_id=user.id).order_by(Draft.created_at.desc()).limit(20).all()
@@ -84,10 +83,22 @@ def home(request: Request, db: Session = Depends(get_session)):
     })
 
 
+@app.get("/signin", response_class=HTMLResponse)
+def signin(request: Request, db: Session = Depends(get_session)):
+    user = current_user(request, db)
+    if user:
+        return RedirectResponse("/", status_code=303)
+    missing = config.missing_required()
+    google_ok = bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
+    core_missing = [m for m in missing if m in ("ANTHROPIC_API_KEY", "FERNET_KEY")]
+    return templates.TemplateResponse("login.html", {
+        "request": request, "missing": core_missing, "google_ok": google_ok})
+
+
 @app.get("/login")
 def login(request: Request):
     if config.missing_required():
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/signin", status_code=303)
     url, state = auth.authorization_url()
     request.session["oauth_state"] = state
     return RedirectResponse(url, status_code=303)
@@ -576,4 +587,24 @@ def unsubscribe_contact(token: str, request: Request, db: Session = Depends(get_
         db.commit()
     return templates.TemplateResponse("unsubscribed.html", {
         "request": request, "found": bool(contact),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Privacy policy / terms of service: public, no login - required by Google's
+# OAuth consent screen branding (Google Auth Platform -> Branding) once the
+# app goes through verification for production/public use.
+# ---------------------------------------------------------------------------
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_policy(request: Request):
+    return templates.TemplateResponse("privacy.html", {
+        "request": request, "updated": datetime.utcnow().strftime("%B %d, %Y"),
+    })
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms_of_service(request: Request):
+    return templates.TemplateResponse("terms.html", {
+        "request": request, "updated": datetime.utcnow().strftime("%B %d, %Y"),
     })

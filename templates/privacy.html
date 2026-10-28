@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy · Alembic</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background: #f4f5fb; color: #191a33;
+           margin: 0; padding: 48px 20px; }
+    .card { background: #fff; border: 1px solid #e3e9f0; border-radius: 16px; padding: 40px;
+            max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 24px; margin: 0 0 4px; }
+    .updated { color: #888; font-size: 13px; margin: 0 0 28px; }
+    h2 { font-size: 17px; margin: 28px 0 10px; }
+    p, li { color: #333; font-size: 15px; line-height: 1.7; }
+    ul { margin: 8px 0; padding-left: 22px; }
+    a { color: #3a5bd9; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: {{ updated }}</p>
+
+    <p>Alembic ("the App") is operated by Tuesdayscorp ("we", "us"). This policy explains
+    what data the App accesses, why, and how it is used when you connect your Google
+    (Gmail) account.</p>
+
+    <h2>What we access, and why</h2>
+    <p>When you connect your Gmail account via Google Sign-In, the App requests permission to:</p>
+    <ul>
+      <li><strong>Read your mailbox (gmail.readonly)</strong> — to find newsletters you're
+        subscribed to and read new messages from the senders you select, so the App can
+        summarize and repurpose them into a new newsletter on your behalf.</li>
+      <li><strong>Send mail as you (gmail.send)</strong> — to send you the research summary
+        and draft newsletter for your approval, and to watch for your reply (e.g. "approved"),
+        all within your own mailbox. The App never sends anything without your explicit
+        reply-based approval.</li>
+    </ul>
+
+    <h2>How your data is used</h2>
+    <p>Email content you've selected is sent to Anthropic's Claude API solely to generate your
+    newsletter summary and draft, and may trigger a live web search (via Claude's web search
+    tool) to research related context for that draft. We do not use Google user data for any
+    purpose beyond providing this specific feature.</p>
+    <p><strong>We do not use your Google user data to train AI models, our own or anyone
+    else's.</strong> Anthropic's commercial API terms likewise state that API data is not used
+    to train their models by default. We do not sell Google user data, and we do not share it
+    with any third party for advertising or any purpose other than generating your newsletter
+    draft as described here.</p>
+    <p>Google user data obtained through Gmail scopes is used only to provide and improve the
+    App's own newsletter-drafting features described above, consistent with the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
+    including its Limited Use requirements.</p>
+
+    <h2>Third parties we use</h2>
+    <ul>
+      <li><strong>Anthropic (Claude API)</strong> — summarizes source content and drafts newsletters.</li>
+      <li><strong>Resend</strong> — delivers the final newsletter to your recipient list (not your Gmail account's own sending).</li>
+      <li><strong>Neon</strong> — hosts the application's database (your account settings, drafts, recipient list).</li>
+      <li><strong>Google</strong> — authentication and, if you connect Gmail, mailbox access as described above.</li>
+    </ul>
+    <p>We do not sell your data or your recipients' data to any third party.</p>
+
+    <h2>Data retention</h2>
+    <p>Drafts, settings, and your recipient list are retained in our database for as long as
+    your account is active. You can request deletion of your account and associated data at
+    any time by contacting us (below). You can revoke the App's access to your Google account
+    at any time from your
+    <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions page</a>.</p>
+
+    <h2>Recipient data</h2>
+    <p>If you upload a recipient list to send newsletters to, those recipients' email
+    addresses are stored to manage sending and honor unsubscribe requests. Every newsletter
+    includes an unsubscribe link; recipients who unsubscribe are permanently excluded from
+    future sends.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy or a data request: <strong>info@tuesdayscorp.com</strong>.</p>
+  </div>
+</body>
+</html>
